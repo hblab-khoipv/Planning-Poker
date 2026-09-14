@@ -1,0 +1,36 @@
+{
+  "name": "planning-poker",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build:shared": "npm run build --workspace @planning-poker/shared",
+    "build": "npm run build:shared && npm run build --workspace @planning-poker/api && npm run build --workspace @planning-poker/web",
+    "dev": "npm run build:shared && npm-run-all --parallel dev:api dev:web",
+    "dev:api": "npm run dev --workspace @planning-poker/api",
+    "dev:web": "npm run dev --workspace @planning-poker/web",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
+    "test:unit": "npm run build:shared && npm run test:unit --workspaces --if-present",
+    "test:integration": "npm run build:shared && npm run test:integration --workspaces --if-present",
+    "test:e2e": "npm run build:shared && npm run test:e2e --workspace @planning-poker/web"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "npm-run-all2": "^7.0.2",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1"
+  }
+}
