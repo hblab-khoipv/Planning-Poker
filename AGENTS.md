@@ -20,7 +20,8 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   Every function takes a `Queryable` first argument, so callers pass the pool or one checked-out
   client to compose several writes into a transaction; repositories never BEGIN/COMMIT themselves.
 - `users`/`accounts`/`sessions`/`verification_token` follow `@auth/pg-adapter`'s required column
-  names verbatim (quoted camelCase included) so task 3 can drop NextAuth in. Two consequences:
+  names verbatim (quoted camelCase included), which is what let NextAuth (below) drop in without a
+  migration. Two consequences:
   PRD §7's `display_name` is the adapter's `name` column, mapped to `displayName` only in TypeScript,
   and ids are `uuid` rather than the adapter docs' `SERIAL` — safe because the adapter never supplies
   an id on insert. Do not rename these columns to match the PRD.
