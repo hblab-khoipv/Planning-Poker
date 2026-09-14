@@ -25,8 +25,8 @@ import { resolveCaller } from '../http/session.js';
 /**
  * Room creation and joining over REST (PRD FR-1, FR-2, FR-3).
  *
- * The participant list here is a plain GET the browser polls; task 5 replaces the polling with
- * the Socket.io stream these same rows will feed.
+ * The participant list here is a plain GET; `apps/api/src/realtime/` streams the same rows over
+ * Socket.io so the browser no longer has to poll it.
  */
 
 /** Body fields arrive as `unknown` from JSON: anything but a string is a 400, not a cast. */
