@@ -31,3 +31,17 @@ Screenshots attached to the pull requests as acceptance evidence.
 > and account it would return); the linking decision that follows is NextAuth's own
 > `callbackHandler` running against the real database, and the session cookie is minted by
 > next-auth's own `encode` from the user that handler returned. Decision logged as issue #4.
+
+## Task 4 — rooms: create & join
+
+| File                                  | What it shows                                                                                                                                             |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `room-01-home.png`                    | Home (PRD §9 screen 1): the "Tạo phòng mới" button and the join-by-code field.                                                                            |
+| `room-02-create-room.png`             | `/rooms/new` (screen 2): room name plus the `fibonacci`/`tshirt` deck choice.                                                                              |
+| `room-03-room-after-create.png`       | The room just created (screen 4): name, code, deck, invite link, and the creator seated as host.                                                           |
+| `room-04-join-by-code.png`            | `/join` (screen 3): typing a room code.                                                                                                                   |
+| `room-05-join-room-guest.png`         | `/join/[code]` after the code resolved to a real room, asking a guest for a display name.                                                                  |
+| `room-06-room-with-guest.png`         | The room once that guest is in: their seat is listed, with `room_participants.user_id` NULL.                                                               |
+| `room-07-join-room-authenticated.png` | The same screen for a signed-in visitor: the account name is prefilled, and they may still rename themselves for this one room.                            |
+| `room-08-room-with-participants.png`  | Three real seats in one room — host, a guest, and a signed-in user — exactly what `GET /rooms/:code/participants` returns (polled every 3s until task 5). |
+| `room-09-join-unknown-code.png`       | An unknown code: a clear error at lookup time, before anyone is asked for a name, and no `room_participants` row written.                                  |
