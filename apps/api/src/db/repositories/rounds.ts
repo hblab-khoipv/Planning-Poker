@@ -62,6 +62,21 @@ export async function findRoundById(db: Queryable, id: string): Promise<VotingRo
 }
 
 /**
+ * Locks the round row for the life of the caller's transaction, so a concurrent `revealRound`
+ * cannot flip the row's status between this read and whatever the caller does next (castVote's
+ * guard against voting into an already-revealed round). Callers outside a transaction get no
+ * benefit from the lock, but the read itself is still correct.
+ */
+export async function lockRoundForUpdate(db: Queryable, roundId: string): Promise<VotingRound | null> {
+  const { rows } = await db.query<RoundRow>(
+    `SELECT ${ROUND_COLUMNS} FROM voting_rounds WHERE id = $1 FOR UPDATE`,
+    [roundId],
+  );
+  const row = rows[0];
+  return row ? mapRound(row) : null;
+}
+
+/**
  * Flips a round to `revealed`, stamping revealed_at in the same statement to satisfy the
  * status/revealed_at check constraint. Already-revealed rounds are left alone (the WHERE
  * clause makes this idempotent), so a double-click cannot move the reveal timestamp.

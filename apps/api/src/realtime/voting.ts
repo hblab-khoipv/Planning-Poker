@@ -14,7 +14,9 @@ import {
   ensureCurrentRound,
   findCurrentRound,
   findRoomById,
+  findRoundById,
   listVotesForRound,
+  lockRoundForUpdate,
   type Participant,
   type Queryable,
   type Room,
@@ -23,6 +25,7 @@ import {
   ValidationError,
   type VotingRound,
 } from '../db/repositories/index.js';
+import { withTransaction } from '../db/transaction.js';
 import { isRoomHost } from '../http/authority.js';
 import { toRoundDto, toRoundStateDto } from '../http/dto.js';
 import { emitRoundReset, emitRoundRevealed, emitVoteCast, type RealtimeServer } from './channel.js';
@@ -89,16 +92,23 @@ export function readVoteRequest(payload: unknown): string {
   return request.value;
 }
 
-/** The round a vote may be cast into: the room's current one, and only while it is open. */
+/**
+ * The round a vote may be cast into: the room's current one, and only while it is open.
+ *
+ * `lockRoundForUpdate` re-reads the round under `FOR UPDATE` after `ensureCurrentRound`, so a
+ * caller running inside `withTransaction` blocks on — and then observes the true outcome of —
+ * a `revealRound` racing on the same row, instead of trusting a status read moments earlier.
+ */
 export async function requireOpenRound(db: Queryable, roomId: string): Promise<VotingRound> {
   const round = await ensureCurrentRound(db, roomId);
-  if (round.status !== 'voting') {
+  const locked = await lockRoundForUpdate(db, round.id);
+  if (!locked || locked.status !== 'voting') {
     throw new VoteActionError(
       VOTE_ERROR_CODES.ROUND_NOT_OPEN,
       'round đã được lộ bài, hãy chờ round mới',
     );
   }
-  return round;
+  return locked;
 }
 
 /**
@@ -132,6 +142,10 @@ export async function requireHost(
  * Changing one's mind is the same call: `castVote` upserts on (round_id, participant_id), so a
  * second card replaces the first rather than adding a ballot, and the room sees the same
  * value-free `vote:cast` either way.
+ *
+ * The open-round check and the insert run on one locked client via `withTransaction`, closing
+ * the gap a plain check-then-act would leave: without the lock, a `round:reveal` landing between
+ * the two could commit a vote into a round the room has already seen revealed.
  */
 export async function handleVoteCast(
   pool: pg.Pool,
@@ -140,13 +154,15 @@ export async function handleVoteCast(
   payload: unknown,
 ): Promise<void> {
   const value = readVoteRequest(payload);
-  const round = await requireOpenRound(pool, context.room.id);
 
-  await castVote(pool, {
-    roundId: round.id,
-    participantId: context.participant.id,
-    deckType: context.room.deckType,
-    value,
+  await withTransaction(pool, async (client) => {
+    const round = await requireOpenRound(client, context.room.id);
+    await castVote(client, {
+      roundId: round.id,
+      participantId: context.participant.id,
+      deckType: context.room.deckType,
+      value,
+    });
   });
   await touchRoom(pool, context.room.id);
 
@@ -159,6 +175,9 @@ export async function handleVoteCast(
  * `revealRound` only matches a round still in `voting`, so a double-click cannot move
  * `revealed_at`; the broadcast is rebuilt from the round as it stands either way, which makes a
  * repeat click a harmless re-announcement rather than a second, differently-timestamped reveal.
+ * When `revealRound` finds nothing to flip — a concurrent reveal already won the race — the
+ * round's actual row is re-read rather than trusting the pre-race `current` snapshot, so that
+ * race resolves as the same harmless re-announcement instead of a spurious refusal.
  */
 export async function handleRoundReveal(
   pool: pg.Pool,
@@ -172,9 +191,8 @@ export async function handleRoundReveal(
     throw new VoteActionError(VOTE_ERROR_CODES.NO_ROUND, 'phòng chưa có round nào để lộ bài');
   }
 
-  const revealed = (await revealRound(pool, current.id)) ?? current;
-  if (revealed.status !== 'revealed') {
-    /* c8 ignore next */
+  const revealed = (await revealRound(pool, current.id)) ?? (await findRoundById(pool, current.id));
+  if (!revealed || revealed.status !== 'revealed') {
     throw new VoteActionError(VOTE_ERROR_CODES.ROUND_NOT_OPEN, 'round không thể lộ bài');
   }
 

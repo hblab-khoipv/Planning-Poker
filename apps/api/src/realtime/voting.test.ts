@@ -96,13 +96,14 @@ describe('readVoteRequest', () => {
 
 describe('requireOpenRound', () => {
   it('returns the round while it is still being voted on', async () => {
-    const db = new FakeDb([{ rows: [roundRow('voting')] }]);
+    // ensureCurrentRound's read, then the FOR UPDATE lock read that guards against a racing reveal.
+    const db = new FakeDb([{ rows: [roundRow('voting')] }, { rows: [roundRow('voting')] }]);
 
     await expect(requireOpenRound(db, ROOM_ID)).resolves.toMatchObject({ status: 'voting' });
   });
 
   it('refuses a vote into a revealed round (FR-4: votes are final once the cards are up)', async () => {
-    const db = new FakeDb([{ rows: [roundRow('revealed')] }]);
+    const db = new FakeDb([{ rows: [roundRow('revealed')] }, { rows: [roundRow('revealed')] }]);
 
     await expect(requireOpenRound(db, ROOM_ID)).rejects.toMatchObject({
       code: VOTE_ERROR_CODES.ROUND_NOT_OPEN,
