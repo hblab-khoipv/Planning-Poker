@@ -25,6 +25,7 @@ export const APP_TABLES = [
   'room_participants',
   'rooms',
   'accounts',
+  'user_credentials',
   'sessions',
   'verification_token',
   'users',

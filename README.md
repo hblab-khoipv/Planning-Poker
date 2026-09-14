@@ -2,7 +2,7 @@
 
 Real-time story point estimation for agile teams. See [`PRD/PRD_Planning_Poker.md`](PRD/PRD_Planning_Poker.md) for the full product spec.
 
-> **Status:** data layer only. This repository contains the monorepo layout, tooling, CI pipeline, and the Postgres schema/migrations plus typed data-access layer for rooms, participants, rounds and votes. REST endpoints, realtime sync, auth wiring and the UI are implemented in follow-up tasks.
+> **Status:** data layer + authentication. This repository contains the monorepo layout, tooling, CI pipeline, the Postgres schema/migrations plus typed data-access layer for rooms, participants, rounds and votes, and NextAuth sign-in (email/password + Google) alongside the guest identity flow. REST endpoints, realtime sync and the room UI are implemented in follow-up tasks.
 
 ## Stack
 
@@ -11,7 +11,7 @@ Real-time story point estimation for agile teams. See [`PRD/PRD_Planning_Poker.m
 | Frontend       | Next.js 15 (App Router) + React 19 + TypeScript + Tailwind CSS         |
 | Backend        | Node.js + Express + Socket.io + TypeScript                             |
 | Database       | PostgreSQL 16                                                          |
-| Auth           | NextAuth (email/password + Google OAuth) — wired in a later task       |
+| Auth           | NextAuth v4 (email/password + Google OAuth) + `@auth/pg-adapter`       |
 | Guest identity | Client-stored `participant_id`, no account required                    |
 | Shared code    | `packages/shared` — deck definitions, socket event names, shared types |
 
@@ -75,6 +75,31 @@ Run the servers individually with `npm run dev:web` / `npm run dev:api`.
 
 > `npm run build:shared` must be re-run after editing `packages/shared`. Apps consume its compiled `dist/` output.
 
+## Authentication and identity
+
+Two kinds of people use a room, and they are kept apart on purpose (PRD §3.1.2, FR-2, FR-8).
+
+**Signed-in users** go through NextAuth v4, configured in `apps/web/src/server/auth/options.ts`:
+
+- **Email + password** — a NextAuth Credentials provider. Sign-up is `POST /api/register` (NextAuth
+  has no sign-up concept of its own); passwords are bcrypt hashes in the `user_credentials` table,
+  never a column on `users` (the adapter does `SELECT * FROM users`, so anything stored there ends
+  up in the session object).
+- **Google** — standard OAuth. Signing in with Google on an address that already has a password
+  account **links to the same `users` row** rather than creating a second one, via the adapter's
+  `accounts` table. A Google profile whose email is not verified is refused before that can happen.
+- Sessions are **JWT**, not database rows: next-auth v4 refuses database sessions when a Credentials
+  provider is enabled. The adapter still owns `users`, `accounts` and OAuth linking.
+
+Set up Google locally by creating an OAuth client (type "Web application") in the Google Cloud
+console with `http://localhost:3000/api/auth/callback/google` as an authorized redirect URI, then
+put its id and secret in `.env`. With those variables empty the button disappears and everything
+else still works.
+
+**Guests** never touch NextAuth or the `users` table. `/join` asks for a display name and stores it
+with a random `participant_id` in the browser (`apps/web/src/lib/guest-identity.ts`); task 4 turns
+that pair into a `room_participants` row with `user_id` NULL.
+
 ## Database
 
 `docker compose up -d` brings up PostgreSQL 16 on port `5432` (override with `POSTGRES_PORT`) with database/user/password all defaulting to `planning_poker`. Data lives in the `postgres-data` named volume.
@@ -132,10 +157,12 @@ Playwright starts the web server itself (`playwright.config.ts` → `webServer`)
 
 See [`.env.example`](.env.example). Notable ones:
 
-| Variable                                                      | Used by | Purpose                                      |
-| ------------------------------------------------------------- | ------- | -------------------------------------------- |
-| `DATABASE_URL`                                                | api     | PostgreSQL connection string                 |
-| `PORT`                                                        | api     | API port (default 4000)                      |
-| `CORS_ORIGIN`                                                 | api     | Allowed browser origin (default web dev URL) |
-| `NEXT_PUBLIC_API_URL`                                         | web     | API base URL exposed to the browser          |
-| `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | web     | NextAuth — consumed in a later task          |
+| Variable                                   | Used by | Purpose                                                               |
+| ------------------------------------------ | ------- | --------------------------------------------------------------------- |
+| `DATABASE_URL`                             | api     | PostgreSQL connection string                                          |
+| `PORT`                                     | api     | API port (default 4000)                                               |
+| `CORS_ORIGIN`                              | api     | Allowed browser origin (default web dev URL)                          |
+| `NEXT_PUBLIC_API_URL`                      | web     | API base URL exposed to the browser                                   |
+| `NEXTAUTH_URL`, `NEXTAUTH_SECRET`          | web     | NextAuth — required; the app signs its session cookie with the secret |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | web     | Google sign-in; leave empty to run with email/password only           |
+| `DATABASE_URL`                             | web     | NextAuth adapter — the same database the API uses                     |

@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import { DECKS } from '@planning-poker/shared';
+import { AuthStatus } from '@/components/auth-status';
 
 export default function HomePage() {
   return (
@@ -12,6 +14,29 @@ export default function HomePage() {
           Ước lượng story point real-time cho buổi refinement của team.
         </p>
       </header>
+
+      <section aria-labelledby="identity-heading" className="space-y-3">
+        <h2 id="identity-heading" className="text-xl font-semibold">
+          Tài khoản
+        </h2>
+        <AuthStatus />
+        <div className="flex flex-wrap gap-3 text-sm">
+          <Link
+            href="/login"
+            data-testid="home-login-link"
+            className="rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white hover:bg-indigo-400"
+          >
+            Đăng nhập / Đăng ký
+          </Link>
+          <Link
+            href="/join"
+            data-testid="home-guest-link"
+            className="rounded-lg border border-slate-700 px-4 py-2 font-semibold text-slate-100 hover:bg-slate-800"
+          >
+            Vào phòng với tư cách khách
+          </Link>
+        </div>
+      </section>
 
       <section aria-labelledby="decks-heading" className="space-y-4">
         <h2 id="decks-heading" className="text-xl font-semibold">

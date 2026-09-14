@@ -24,6 +24,20 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   PRD §7's `display_name` is the adapter's `name` column, mapped to `displayName` only in TypeScript,
   and ids are `uuid` rather than the adapter docs' `SERIAL` — safe because the adapter never supplies
   an id on insert. Do not rename these columns to match the PRD.
+- Auth lives in `apps/web` (NextAuth v4 + `@auth/pg-adapter`), not in `apps/api`: it runs in the
+  Next.js server runtime, so `apps/web/src/server/db/pool.ts` is a second pool onto the _same_
+  database. `apps/api` still owns the schema and migrations — never add a migration under `apps/web`.
+- Password hashes live in `user_credentials`, never on `users`: the adapter runs `SELECT * FROM users`
+  in three of its methods, so any column added there lands in the NextAuth session object.
+- Sessions are JWT, not database rows — next-auth v4 refuses database sessions once a Credentials
+  provider is configured. `sessions` still exists and is exercised by the adapter tests.
+- Google uses `allowDangerousEmailAccountLinking` so one person is one `users` row; the `signIn`
+  callback refuses any Google profile with `email_verified !== true`, which is what makes that safe.
+  Changing either without the other reopens an account-takeover path.
+- Objects in `authOptions.providers` are **not** what NextAuth runs: `GoogleProvider(...)` /
+  `CredentialsProvider(...)` stash the caller's settings under `.options` and NextAuth merges them
+  in per request. Tests must go through `apps/web/tests/helpers/next-auth-internals.ts`, which also
+  loads next-auth's real `callbackHandler` for the account-linking gate (issue #2).
 - Integration tests get fixtures from `apps/api/tests/helpers/seed.ts` (`seedRoomWithRound`,
   `truncateAll`); they build rows through the real repositories, so use them rather than raw INSERTs.
 

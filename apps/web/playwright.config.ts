@@ -19,6 +19,12 @@ export default defineConfig({
   webServer: {
     command: `npm run start -- --port ${PORT}`,
     url: baseURL,
+    // NextAuth refuses to answer /api/auth/session without a secret. The e2e suite never signs
+    // anyone in, so any value will do — it just keeps the endpoint from 500ing under the pages.
+    env: {
+      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ?? 'e2e-placeholder-secret',
+      NEXTAUTH_URL: baseURL,
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
