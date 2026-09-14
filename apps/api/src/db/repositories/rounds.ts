@@ -1,6 +1,6 @@
 import type { RoundStatus } from '@planning-poker/shared';
 import { expectOne } from './users.js';
-import { type Queryable, type VotingRound } from './types.js';
+import { isUniqueViolation, type Queryable, type VotingRound } from './types.js';
 
 interface RoundRow {
   id: string;
@@ -76,6 +76,29 @@ export async function revealRound(db: Queryable, roundId: string): Promise<Votin
   );
   const row = rows[0];
   return row ? mapRound(row) : null;
+}
+
+/**
+ * The room's current round, opening round 1 if the room has none yet.
+ *
+ * A room is created with its first round (see `routes/rooms.ts`), so in practice this only
+ * opens one for a room that predates that — or for a fixture that seeded a room directly. It
+ * is not a transaction: two callers racing here both lose nothing, because the loser of the
+ * (room_id, round_number) unique index simply re-reads the round the winner created.
+ */
+export async function ensureCurrentRound(db: Queryable, roomId: string): Promise<VotingRound> {
+  const existing = await findCurrentRound(db, roomId);
+  if (existing) return existing;
+
+  try {
+    return await createRound(db, roomId);
+  } catch (error) {
+    if (!isUniqueViolation(error)) throw error;
+    const raced = await findCurrentRound(db, roomId);
+    /* c8 ignore next */
+    if (!raced) throw error;
+    return raced;
+  }
 }
 
 export async function listRounds(db: Queryable, roomId: string): Promise<VotingRound[]> {

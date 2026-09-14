@@ -86,6 +86,25 @@ export async function listVoterIds(db: Queryable, roundId: string): Promise<stri
   return rows.map((row) => row.participant_id);
 }
 
+/**
+ * One participant's own vote in a round.
+ *
+ * The narrow read exists so a socket can restore *its own* selection after a reload without the
+ * server ever loading anybody else's value into a pre-reveal code path (FR-4).
+ */
+export async function findVoteForParticipant(
+  db: Queryable,
+  roundId: string,
+  participantId: string,
+): Promise<Vote | null> {
+  const { rows } = await db.query<VoteRow>(
+    `SELECT ${VOTE_COLUMNS} FROM votes WHERE round_id = $1 AND participant_id = $2`,
+    [roundId, participantId],
+  );
+  const row = rows[0];
+  return row ? mapVote(row) : null;
+}
+
 export async function deleteVote(
   db: Queryable,
   roundId: string,

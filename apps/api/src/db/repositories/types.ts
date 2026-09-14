@@ -27,7 +27,10 @@ export interface Room {
   code: string;
   name: string;
   deckType: DeckType;
+  /** The host's account, or null when a guest created the room. */
   hostId: string | null;
+  /** The host's seat (migration 0004) — the half of host authority a guest host has. */
+  hostParticipantId: string | null;
   createdAt: Date;
   lastActiveAt: Date;
 }

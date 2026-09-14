@@ -13,8 +13,9 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 - `packages/shared` is consumed as compiled output — run `npm run build:shared` after editing it,
   and before any typecheck/test/build that touches `apps/*`.
 - Integration and e2e tests both need Postgres (`docker compose up -d` + `npm run migrate`);
-  e2e additionally needs `apps/api` **built**, because `playwright.config.ts` starts the API and
-  the web app as two `webServer` entries and the browser drives the real REST endpoints.
+  e2e additionally needs **both apps built** (`npm run build`), because `playwright.config.ts`
+  starts them with `npm run start` (`next start` serves the last build) and `reuseExistingServer`
+  is on locally — so a stale build, or a server left running on 3000/4000, silently tests old UI.
   That config is loaded as CommonJS — `import.meta` does not work in it.
 - Lint/typecheck/unit/integration/e2e are five separate CI jobs in `.github/workflows/ci.yml`;
   each maps to a root npm script of the same name. Add test files to the existing directories
@@ -65,7 +66,22 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   testable without a database.
 - Every server→room broadcast goes through `realtime/channel.ts`. That is deliberate: `vote:cast`
   is built there from a participant id and there is no parameter a vote value could arrive
-  through, which is how FR-4's secrecy survives task 6. Do not emit to a room from anywhere else.
+  through. Do not emit to a room from anywhere else.
+- FR-4's secrecy is structural, not a rule handlers remember. `toRoundStateDto` (`http/dto.ts`) is
+  the single choke point every publisher of round state uses — socket snapshot, reveal broadcast,
+  `GET /rooms/:code/round` — and it strips values unless the row says `revealed`. The one payload
+  naming a value pre-reveal is `room:state.myVote` (the socket's _own_ card), safe only because
+  `room:state` goes out with `socket.emit` to one socket. Keep it that way.
+- Host authority lives in `http/authority.ts` (`isRoomHost`) and nowhere else: the Host badge in
+  the DTO and the reveal/reset gate in `realtime/voting.ts` both call it, so they cannot disagree.
+  A room has two host facts and matching **either** is enough — `rooms.host_id` (the account, NULL
+  for a guest-created room) or `rooms.host_participant_id` (the creator's seat, migration 0004,
+  set for every room). Without the second, guest-created rooms — the primary MVP flow — would have
+  no one able to press "Lộ bài". See issue #9; PRD §12 asked the question, MVP answer is host-only.
+- "Vote lại" and "Task tiếp theo / Round mới" are one backend action (`round:reset` → a new
+  `voting_rounds` row); only the button label differs. PRD §8 lists one event and §7 one record.
+- `POST /rooms` opens round 1 in the same transaction that creates the room and seats its host;
+  `ensureCurrentRound` covers rooms seeded directly by fixtures.
 - Presence is connection-counted, not event-counted (`realtime/presence.ts`): several sockets per
   seat (second tab, reload overlap) announce one join, and the last one closing only counts as a
   departure after `SOCKET_DISCONNECT_GRACE_MS` (default 5s). That window is PRD §12's

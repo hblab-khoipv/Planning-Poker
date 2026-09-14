@@ -4,12 +4,16 @@ import type pg from 'pg';
 import {
   addParticipant,
   createRoom,
+  createRound,
+  ensureCurrentRound,
   findRoomByCode,
   findUserById,
+  listVotesForRound,
   type Participant,
   type Queryable,
   type Room,
   setParticipantOnline,
+  setRoomHostParticipant,
   touchRoom,
 } from '../db/repositories/index.js';
 import {
@@ -18,7 +22,7 @@ import {
   renameParticipant,
 } from '../db/repositories/participants.js';
 import { withTransaction } from '../db/transaction.js';
-import { toParticipantDto, toRoomDto } from '../http/dto.js';
+import { toParticipantDto, toRoomDto, toRoundStateDto } from '../http/dto.js';
 import { asyncRoute, badRequest, notFound } from '../http/errors.js';
 import { resolveCaller } from '../http/session.js';
 
@@ -81,6 +85,7 @@ async function participantResponse(
   return toParticipantDto(participant, {
     userName: user?.displayName ?? null,
     hostId: room.hostId,
+    hostParticipantId: room.hostParticipantId,
   });
 }
 
@@ -130,6 +135,10 @@ export function createRoomsRouter(pool: pg.Pool): Router {
       const deckType = readDeckType(body.deckType);
       const displayName = readDisplayName(body.displayName, { required: caller === null });
 
+      // One transaction, because a room is not usable without its three parts: the row itself,
+      // the creator's seat, and the host link between them. A guest-created room has no
+      // `host_id` to fall back on (PRD §7), so if `host_participant_id` were written separately
+      // and that write were lost, the room would exist with nobody able to reveal in it.
       const { room, participant } = await withTransaction(pool, async (db) => {
         const created = await createRoom(db, {
           name,
@@ -140,7 +149,11 @@ export function createRoomsRouter(pool: pg.Pool): Router {
           userId: caller?.userId ?? null,
           displayName,
         });
-        return { room: created, participant: seat };
+        const hosted = (await setRoomHostParticipant(db, created.id, seat.id)) ?? created;
+        // Round 1 opens with the room, so the first person in can vote without waiting for
+        // anybody to press anything.
+        await createRound(db, created.id);
+        return { room: hosted, participant: seat };
       });
 
       res.status(201).json({
@@ -198,9 +211,31 @@ export function createRoomsRouter(pool: pg.Pool): Router {
 
       res.status(200).json({
         participants: participants.map((participant) =>
-          toParticipantDto(participant, { hostId: room.hostId }),
+          toParticipantDto(participant, {
+            hostId: room.hostId,
+            hostParticipantId: room.hostParticipantId,
+          }),
         ),
       });
+    }),
+  );
+
+  /**
+   * FR-4/FR-6 over REST: the current round, and what the caller is allowed to know about it.
+   *
+   * This is the same `toRoundStateDto` the socket snapshot and the reveal broadcast go through,
+   * so there is no second opinion about when a card value becomes public — while the round is
+   * `voting` this endpoint returns who has voted and nothing else, for anybody who asks. That
+   * makes the secrecy guarantee testable from outside the socket layer entirely.
+   */
+  router.get(
+    '/:code/round',
+    asyncRoute(async (req, res) => {
+      const room = await requireRoom(pool, req.params.code ?? '');
+      const round = await ensureCurrentRound(pool, room.id);
+      const votes = await listVotesForRound(pool, round.id);
+
+      res.status(200).json(toRoundStateDto(round, votes, room.deckType));
     }),
   );
 

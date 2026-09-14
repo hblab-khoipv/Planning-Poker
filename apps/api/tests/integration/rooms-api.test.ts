@@ -59,10 +59,14 @@ describe('room REST API', () => {
         deckType: 'fibonacci',
         hostId: null,
       });
+      // A guest creator hosts their own room (migration 0004). `hostId` stays null — there is
+      // no account to point at — but `hostParticipantId` names their seat, which is what gives
+      // a guest-created room somebody who may press "Lộ bài" at all (PRD §12).
+      expect(response.body.room.hostParticipantId).toBe(response.body.participant.id);
       expect(response.body.participant).toMatchObject({
         displayName: 'Khôi',
         isGuest: true,
-        isHost: false,
+        isHost: true,
         isOnline: true,
       });
 

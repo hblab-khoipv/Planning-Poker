@@ -15,6 +15,7 @@ interface RoomRow {
   name: string;
   deck_type: DeckType;
   host_id: string | null;
+  host_participant_id: string | null;
   created_at: Date;
   last_active_at: Date;
 }
@@ -26,12 +27,14 @@ export function mapRoom(row: RoomRow): Room {
     name: row.name,
     deckType: row.deck_type,
     hostId: row.host_id,
+    hostParticipantId: row.host_participant_id,
     createdAt: row.created_at,
     lastActiveAt: row.last_active_at,
   };
 }
 
-const ROOM_COLUMNS = 'id, code, name, deck_type, host_id, created_at, last_active_at';
+const ROOM_COLUMNS =
+  'id, code, name, deck_type, host_id, host_participant_id, created_at, last_active_at';
 
 export const ROOM_NAME_MAX_LENGTH = 80;
 
@@ -109,6 +112,29 @@ export async function findRoomByCode(db: Queryable, code: string): Promise<Room 
 
 export async function findRoomById(db: Queryable, id: string): Promise<Room | null> {
   const { rows } = await db.query<RoomRow>(`SELECT ${ROOM_COLUMNS} FROM rooms WHERE id = $1`, [id]);
+  const row = rows[0];
+  return row ? mapRoom(row) : null;
+}
+
+/**
+ * Records which seat hosts the room (migration 0004).
+ *
+ * Only ever fills a NULL, so this cannot be used to steal a room: once a room has a host seat,
+ * the only thing that clears it is that seat being deleted. `POST /rooms` calls it inside the
+ * same transaction that creates the room and seats its creator, so a room is never visible
+ * without a host.
+ */
+export async function setRoomHostParticipant(
+  db: Queryable,
+  roomId: string,
+  participantId: string,
+): Promise<Room | null> {
+  const { rows } = await db.query<RoomRow>(
+    `UPDATE rooms SET host_participant_id = $2
+      WHERE id = $1 AND host_participant_id IS NULL
+      RETURNING ${ROOM_COLUMNS}`,
+    [roomId, participantId],
+  );
   const row = rows[0];
   return row ? mapRoom(row) : null;
 }
