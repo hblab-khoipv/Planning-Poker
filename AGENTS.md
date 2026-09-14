@@ -12,7 +12,10 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   (Express + Socket.io + own Postgres + NextAuth) because the deployment target is a single EC2 box.
 - `packages/shared` is consumed as compiled output — run `npm run build:shared` after editing it,
   and before any typecheck/test/build that touches `apps/*`.
-- Integration tests need Postgres: `docker compose up -d` first.
+- Integration and e2e tests both need Postgres (`docker compose up -d` + `npm run migrate`);
+  e2e additionally needs `apps/api` **built**, because `playwright.config.ts` starts the API and
+  the web app as two `webServer` entries and the browser drives the real REST endpoints.
+  That config is loaded as CommonJS — `import.meta` does not work in it.
 - Lint/typecheck/unit/integration/e2e are five separate CI jobs in `.github/workflows/ci.yml`;
   each maps to a root npm script of the same name. Add test files to the existing directories
   rather than changing CI plumbing.
@@ -39,6 +42,21 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   `CredentialsProvider(...)` stash the caller's settings under `.options` and NextAuth merges them
   in per request. Tests must go through `apps/web/tests/helpers/next-auth-internals.ts`, which also
   loads next-auth's real `callbackHandler` for the account-linking gate (issue #2).
+- REST lives in `apps/api/src/routes/` with the plumbing in `src/http/`: `errors.ts` maps the data
+  layer's `ValidationError`/`ConflictError` onto statuses (routes just call repositories and let it
+  throw), `dto.ts` is the only place row shapes become wire shapes, and `withTransaction` in
+  `src/db/transaction.ts` is how a route composes several repository writes.
+- `apps/api` authenticates a caller by decrypting NextAuth's session cookie itself
+  (`src/http/session.ts`, via `next-auth/jwt`) with the `NEXTAUTH_SECRET` that `apps/web` uses —
+  never from a user id in the request body. An absent/invalid secret or cookie means "guest",
+  never an error. Tests mint cookies with next-auth's own `encode`.
+- Anything both sides of the wire must agree on goes in `packages/shared`: deck definitions, the
+  REST DTOs, display-name rules, and the room-code alphabet/parsing (`generateRoomCode` stays in
+  `apps/api` because it needs a CSPRNG). Changing a rule in only one app is the bug this prevents.
+- A guest has no `user_id` for the server to key on, so `POST /rooms/:code/join` returns the seat
+  id and the browser stores it **per room** (`apps/web/src/lib/room-membership.ts`) — one browser
+  can hold seats in several rooms, so the single `participant_id` from the guest identity cannot
+  be the `room_participants.id`.
 - Integration tests get fixtures from `apps/api/tests/helpers/seed.ts` (`seedRoomWithRound`,
   `truncateAll`); they build rows through the real repositories, so use them rather than raw INSERTs.
 

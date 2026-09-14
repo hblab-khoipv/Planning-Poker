@@ -3,6 +3,7 @@ import {
   generateRoomCode,
   isValidRoomCode,
   normalizeRoomCode,
+  parseRoomCode,
   ROOM_CODE_LENGTH,
 } from './room-code.js';
 
@@ -77,5 +78,24 @@ describe('isValidRoomCode', () => {
     ['untrimmed', ' AB12CD34'],
   ])('rejects a %s code', (_label, code) => {
     expect(isValidRoomCode(code)).toBe(false);
+  });
+});
+
+/** What both the join form and `findRoomByCode` use: normalise, then accept or reject outright. */
+describe('parseRoomCode', () => {
+  it('rescues a code typed in lower case with confusable characters', () => {
+    expect(parseRoomCode('  ilou2345 ')).toBe('110V2345');
+  });
+
+  it('returns null for anything that is not a code', () => {
+    expect(parseRoomCode('')).toBeNull();
+    expect(parseRoomCode('AB12CD3')).toBeNull();
+    expect(parseRoomCode('AB12-CD34')).toBeNull();
+  });
+
+  it('round-trips a generated code', () => {
+    const code = generateRoomCode();
+
+    expect(parseRoomCode(code)).toBe(code);
   });
 });

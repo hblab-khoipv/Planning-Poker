@@ -1,3 +1,4 @@
+import { MAX_GUEST_NAME_LENGTH, normalizeGuestName } from '@planning-poker/shared';
 import { expectOne } from './users.js';
 import {
   ConflictError,
@@ -29,7 +30,12 @@ export function mapParticipant(row: ParticipantRow): Participant {
 
 const PARTICIPANT_COLUMNS = 'id, room_id, user_id, guest_name, joined_at, is_online';
 
-export const GUEST_NAME_MAX_LENGTH = 40;
+/** Guards the id columns: Postgres raises a 22P02 on a malformed uuid, which is a 500, not a 404. */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** @deprecated Use `MAX_GUEST_NAME_LENGTH` from `@planning-poker/shared`. Kept as an alias so
+ * both sides of the wire agree on one number. */
+export const GUEST_NAME_MAX_LENGTH = MAX_GUEST_NAME_LENGTH;
 
 export interface AddParticipantInput {
   roomId: string;
@@ -44,11 +50,15 @@ export interface AddParticipantInput {
  * signed-in user by their id, and somebody with neither cannot be shown in the room list.
  */
 export function assertParticipantIdentity(input: AddParticipantInput): string | null {
-  const guestName = input.guestName?.trim() ?? null;
+  const raw = input.guestName ?? null;
 
-  if (guestName !== null && guestName.length > GUEST_NAME_MAX_LENGTH) {
-    throw new ValidationError(`guest name must be at most ${GUEST_NAME_MAX_LENGTH} characters`);
+  // Reject before normalising, so a 60-character name is an error rather than a silent truncation.
+  if (raw !== null && raw.trim().length > MAX_GUEST_NAME_LENGTH) {
+    throw new ValidationError(`guest name must be at most ${MAX_GUEST_NAME_LENGTH} characters`);
   }
+
+  const guestName = raw === null ? null : normalizeGuestName(raw);
+
   if (!input.userId && !guestName) {
     throw new ValidationError('a guest participant must have a display name');
   }
@@ -140,4 +150,68 @@ export async function removeParticipant(db: Queryable, participantId: string): P
     participantId,
   ]);
   return (rowCount ?? 0) > 0;
+}
+
+/** A seat plus the account name behind it, which is what a participant list has to render. */
+export interface ParticipantWithUser extends Participant {
+  /** `users.name` for a signed-in participant, NULL for a guest. */
+  userName: string | null;
+}
+
+/**
+ * The room's participant list in join order. Joined against `users` so a signed-in member who
+ * never typed a per-room name is still shown by their account name rather than as blank.
+ */
+export async function listParticipantsWithUsers(
+  db: Queryable,
+  roomId: string,
+): Promise<ParticipantWithUser[]> {
+  const { rows } = await db.query<ParticipantRow & { user_name: string | null }>(
+    `SELECT ${PARTICIPANT_COLUMNS.split(', ')
+      .map((column) => `p.${column}`)
+      .join(', ')}, u.name AS user_name
+       FROM room_participants p
+       LEFT JOIN users u ON u.id = p.user_id
+      WHERE p.room_id = $1
+      ORDER BY p.joined_at, p.id`,
+    [roomId],
+  );
+  return rows.map((row) => ({ ...mapParticipant(row), userName: row.user_name }));
+}
+
+/**
+ * Looks a seat up inside one room. The guest rejoin path uses it: the browser presents the
+ * participant id it stored for this room, and we only honour it if it really is a seat here.
+ */
+export async function findParticipantInRoom(
+  db: Queryable,
+  roomId: string,
+  participantId: string,
+): Promise<Participant | null> {
+  if (!UUID_PATTERN.test(participantId)) return null;
+
+  const { rows } = await db.query<ParticipantRow>(
+    `SELECT ${PARTICIPANT_COLUMNS} FROM room_participants WHERE id = $1 AND room_id = $2`,
+    [participantId, roomId],
+  );
+  const row = rows[0];
+  return row ? mapParticipant(row) : null;
+}
+
+/** Renames a seat in place, keeping its id (and therefore its votes). */
+export async function renameParticipant(
+  db: Queryable,
+  participantId: string,
+  guestName: string,
+): Promise<Participant | null> {
+  const name = normalizeGuestName(guestName);
+  if (name.length === 0) throw new ValidationError('a guest participant must have a display name');
+
+  const { rows } = await db.query<ParticipantRow>(
+    `UPDATE room_participants SET guest_name = $2, is_online = true
+      WHERE id = $1 RETURNING ${PARTICIPANT_COLUMNS}`,
+    [participantId, name],
+  );
+  const row = rows[0];
+  return row ? mapParticipant(row) : null;
 }

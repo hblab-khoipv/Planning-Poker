@@ -95,8 +95,25 @@ jobs:
   e2e:
     name: E2E tests
     runs-on: ubuntu-latest
+    # The room flow is a browser talking to the real API and database, so this job needs
+    # Postgres too; Playwright starts both servers itself (apps/web/playwright.config.ts).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: planning_poker
+          POSTGRES_PASSWORD: planning_poker
+          POSTGRES_DB: planning_poker
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U planning_poker -d planning_poker"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     env:
-      NEXT_PUBLIC_API_URL: http://localhost:4000
+      DATABASE_URL: postgresql://planning_poker:planning_poker@localhost:5432/planning_poker
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -107,6 +124,10 @@ jobs:
         run: npm ci
       - name: Build shared package
         run: npm run build:shared
+      - name: Apply database migrations
+        run: npm run migrate --workspace @planning-poker/api
+      - name: Build API
+        run: npm run build --workspace @planning-poker/api
       - name: Build web app
         run: npm run build --workspace @planning-poker/web
       - name: Install Playwright browsers
