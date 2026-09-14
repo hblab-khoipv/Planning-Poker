@@ -1,5 +1,6 @@
 import { PARTICIPANT_ID_STORAGE_KEY } from '@planning-poker/shared';
 import { expect, test } from '@playwright/test';
+import { createRoomViaApi } from './helpers/rooms';
 
 /**
  * Guest identity end to end (PRD §3.1.2, FR-2): a name and a browser-stored participant id,
@@ -9,46 +10,53 @@ import { expect, test } from '@playwright/test';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 test.describe('guest identity', () => {
-  test('turns a typed name into a persistent participant id', async ({ page }) => {
-    await page.goto('/join');
+  test('remembers the name a guest typed, so the next room is prefilled', async ({
+    page,
+    request,
+  }) => {
+    const first = await createRoomViaApi(request);
+    const second = await createRoomViaApi(request);
 
-    await page.getByLabel('Tên hiển thị').fill('Khôi');
-    await page.getByRole('button', { name: 'Lưu tên và tiếp tục' }).click();
+    await page.goto(`/join/${first.room.code}`);
+    await page.getByTestId('join-name-input').fill('Khôi');
+    await page.getByTestId('join-room-submit').click();
+    await expect(page.getByTestId('participant-me')).toBeVisible();
 
-    await expect(page.getByTestId('guest-display-name')).toHaveText('Khôi');
-    const participantId = await page.getByTestId('guest-participant-id').innerText();
-    expect(participantId).toMatch(UUID);
-
-    const stored = await page.evaluate(
+    const participantId = await page.evaluate(
       (key) => window.localStorage.getItem(key),
       PARTICIPANT_ID_STORAGE_KEY,
     );
-    expect(stored).toBe(participantId);
+    expect(participantId).toMatch(UUID);
 
-    // Same browser, same person: reloading must not mint a second identity.
-    await page.reload();
-    await expect(page.getByTestId('guest-participant-id')).toHaveText(participantId);
-    await expect(page.getByLabel('Tên hiển thị')).toHaveValue('Khôi');
+    await page.goto(`/join/${second.room.code}`);
+    await expect(page.getByTestId('join-name-input')).toHaveValue('Khôi');
   });
 
-  test('keeps the id when the guest renames themselves', async ({ page }) => {
-    await page.goto('/join');
-    await page.getByLabel('Tên hiển thị').fill('Tên cũ');
-    await page.getByRole('button', { name: 'Lưu tên và tiếp tục' }).click();
-    const first = await page.getByTestId('guest-participant-id').innerText();
+  test('keeps one seat per room and a different seat in each room', async ({ page, request }) => {
+    const first = await createRoomViaApi(request);
+    const second = await createRoomViaApi(request);
 
-    await page.getByLabel('Tên hiển thị').fill('Tên mới');
-    await page.getByRole('button', { name: 'Lưu tên và tiếp tục' }).click();
+    for (const code of [first.room.code, second.room.code]) {
+      await page.goto(`/join/${code}`);
+      await page.getByTestId('join-name-input').fill('Khôi');
+      await page.getByTestId('join-room-submit').click();
+      await expect(page.getByTestId('participant-item')).toHaveCount(2);
+    }
 
-    await expect(page.getByTestId('guest-display-name')).toHaveText('Tên mới');
-    await expect(page.getByTestId('guest-participant-id')).toHaveText(first);
+    const seats = await page.evaluate(() =>
+      Object.keys(window.localStorage).filter((key) => key.endsWith(':participant-id')),
+    );
+    // One browser-wide identity plus one seat per room joined.
+    expect(seats).toHaveLength(3);
   });
 
-  test('never signs the guest in', async ({ page }) => {
-    await page.goto('/join');
-    await page.getByLabel('Tên hiển thị').fill('Khôi');
-    await page.getByRole('button', { name: 'Lưu tên và tiếp tục' }).click();
-    await expect(page.getByTestId('guest-identity')).toBeVisible();
+  test('never signs the guest in', async ({ page, request }) => {
+    const { room } = await createRoomViaApi(request);
+
+    await page.goto(`/join/${room.code}`);
+    await page.getByTestId('join-name-input').fill('Khôi');
+    await page.getByTestId('join-room-submit').click();
+    await expect(page.getByTestId('participant-me')).toBeVisible();
 
     await page.goto('/');
     await expect(page.getByTestId('auth-status')).toContainText('Chưa đăng nhập');

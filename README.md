@@ -2,7 +2,7 @@
 
 Real-time story point estimation for agile teams. See [`PRD/PRD_Planning_Poker.md`](PRD/PRD_Planning_Poker.md) for the full product spec.
 
-> **Status:** data layer + authentication. This repository contains the monorepo layout, tooling, CI pipeline, the Postgres schema/migrations plus typed data-access layer for rooms, participants, rounds and votes, and NextAuth sign-in (email/password + Google) alongside the guest identity flow. REST endpoints, realtime sync and the room UI are implemented in follow-up tasks.
+> **Status:** rooms can be created and joined. On top of the monorepo layout, CI pipeline, Postgres schema/data-access layer and NextAuth sign-in, the app now has the room REST API (`POST /rooms`, `GET /rooms/:code`, `POST /rooms/:code/join`, `GET /rooms/:code/participants`) and the screens for it: home, create room, join room, and a room page with a polled participant list. Realtime sync (Socket.io), voting, reveal and session history are implemented in follow-up tasks.
 
 ## Stack
 
@@ -96,9 +96,33 @@ console with `http://localhost:3000/api/auth/callback/google` as an authorized r
 put its id and secret in `.env`. With those variables empty the button disappears and everything
 else still works.
 
-**Guests** never touch NextAuth or the `users` table. `/join` asks for a display name and stores it
-with a random `participant_id` in the browser (`apps/web/src/lib/guest-identity.ts`); task 4 turns
-that pair into a `room_participants` row with `user_id` NULL.
+**Guests** never touch NextAuth or the `users` table. The join screen asks for a display name and
+stores it with a random `participant_id` in the browser (`apps/web/src/lib/guest-identity.ts`);
+`POST /rooms/:code/join` turns that into a `room_participants` row with `user_id` NULL.
+
+The API identifies a signed-in caller by decrypting NextAuth's session cookie itself
+(`apps/api/src/http/session.ts`), using the `NEXTAUTH_SECRET` both processes share — so a user id
+is never taken from the request body. The web app and the API are the same site (cookies ignore
+the port), which holds for the single-host deployment target as well as for local dev. With no
+secret configured the API simply treats everybody as a guest.
+
+## Rooms
+
+`POST /rooms` mints a random 8-character join code (`apps/api/src/db/room-code.ts`), never a
+sequential id (PRD §10), and seats the creator in the same transaction — as host when they are
+signed in. Joining is idempotent on both sides: a signed-in user is matched on `user_id` by the
+partial unique index from task 2, and a guest's browser re-presents the `room_participants.id`
+it stored for that room (`apps/web/src/lib/room-membership.ts`), so a reload never costs a second
+seat — or, from task 6, a second vote.
+
+| Endpoint                        | Purpose                                                      |
+| ------------------------------- | ------------------------------------------------------------ |
+| `POST /rooms`                   | Create a room and seat the creator (FR-1)                    |
+| `GET /rooms/:code`              | Resolve a join code, so a mistyped one fails before the name |
+| `POST /rooms/:code/join`        | Take a seat in the room (FR-2)                               |
+| `GET /rooms/:code/participants` | The participant list (FR-3, polled until task 5 pushes it)   |
+
+Screens: `/` (create or enter a code), `/rooms/new`, `/join` → `/join/[code]`, `/rooms/[code]`.
 
 ## Database
 
@@ -127,7 +151,7 @@ Every category runs as its own CI job and can be run locally the same way.
 | Typecheck   | `npm run typecheck`        | tsc (all workspaces)       | —                        |
 | Unit        | `npm run test:unit`        | Vitest + supertest         | —                        |
 | Integration | `npm run test:integration` | Vitest + `pg`              | `docker compose up -d`   |
-| E2E         | `npm run test:e2e`         | Playwright (Chromium)      | built web app + browsers |
+| E2E         | `npm run test:e2e`         | Playwright (Chromium)      | Postgres + built api/web |
 
 ```bash
 # Formatting
@@ -141,28 +165,31 @@ npm run test:unit
 docker compose up -d
 npm run test:integration
 
-# E2E — loads the built home page in a real browser
+# E2E — drives the real room flow in a real browser, against the real API and database
+docker compose up -d
+npm run migrate --workspace @planning-poker/api
+npm run build --workspace @planning-poker/api
 npm run build --workspace @planning-poker/web
 npm run test:e2e:install --workspace @planning-poker/web   # once, downloads Chromium
 npm run test:e2e
 ```
 
-Playwright starts the web server itself (`playwright.config.ts` → `webServer`), reusing an already-running one locally. Override the target with `E2E_BASE_URL` / `E2E_PORT`.
+Playwright starts both servers itself (`playwright.config.ts` → `webServer`), reusing already-running ones locally. Override the targets with `E2E_BASE_URL` / `E2E_PORT` / `E2E_API_PORT`.
 
 ## CI
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request as **five independent jobs**: `lint`, `typecheck`, `unit`, `integration` (with a Postgres service container), and `e2e` (Playwright, uploads its HTML report as an artifact). Adding test files to the existing directories requires no CI changes.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request as **five independent jobs**: `lint`, `typecheck`, `unit`, `integration` and `e2e` (the last two each with a Postgres service container; `e2e` also builds and starts the API, and uploads its Playwright HTML report as an artifact). Adding test files to the existing directories requires no CI changes.
 
 ## Environment variables
 
 See [`.env.example`](.env.example). Notable ones:
 
-| Variable                                   | Used by | Purpose                                                               |
-| ------------------------------------------ | ------- | --------------------------------------------------------------------- |
-| `DATABASE_URL`                             | api     | PostgreSQL connection string                                          |
-| `PORT`                                     | api     | API port (default 4000)                                               |
-| `CORS_ORIGIN`                              | api     | Allowed browser origin (default web dev URL)                          |
-| `NEXT_PUBLIC_API_URL`                      | web     | API base URL exposed to the browser                                   |
-| `NEXTAUTH_URL`, `NEXTAUTH_SECRET`          | web     | NextAuth — required; the app signs its session cookie with the secret |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | web     | Google sign-in; leave empty to run with email/password only           |
-| `DATABASE_URL`                             | web     | NextAuth adapter — the same database the API uses                     |
+| Variable                                   | Used by | Purpose                                                                       |
+| ------------------------------------------ | ------- | ----------------------------------------------------------------------------- |
+| `DATABASE_URL`                             | api     | PostgreSQL connection string                                                  |
+| `PORT`                                     | api     | API port (default 4000)                                                       |
+| `CORS_ORIGIN`                              | api     | Allowed browser origins, comma-separated (default: the web dev URLs)          |
+| `NEXT_PUBLIC_API_URL`                      | web     | API base URL exposed to the browser                                           |
+| `NEXTAUTH_URL`, `NEXTAUTH_SECRET`          | web+api | NextAuth — required; the API verifies the session cookie with the same secret |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | web     | Google sign-in; leave empty to run with email/password only                   |
+| `DATABASE_URL`                             | web     | NextAuth adapter — the same database the API uses                             |

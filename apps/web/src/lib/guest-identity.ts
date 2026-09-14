@@ -1,4 +1,9 @@
-import { PARTICIPANT_ID_STORAGE_KEY } from '@planning-poker/shared';
+import {
+  isValidGuestName,
+  MAX_GUEST_NAME_LENGTH,
+  normalizeGuestName,
+  PARTICIPANT_ID_STORAGE_KEY,
+} from '@planning-poker/shared';
 
 /**
  * Guest identity (PRD §3.1.2, §6 "Guest session", FR-2).
@@ -6,8 +11,9 @@ import { PARTICIPANT_ID_STORAGE_KEY } from '@planning-poker/shared';
  * A visitor who never signs in still needs to be the same person across a reload: they get a
  * random `participant_id` kept in the browser plus the display name they typed when joining.
  * None of this touches NextAuth or the `users` table — a guest has no account, and
- * `room_participants.user_id` stays NULL for them (task 2 schema). Task 4's join endpoint reads
- * the value produced here; until then nothing server-side depends on it.
+ * `room_participants.user_id` stays NULL for them (task 2 schema). The name recorded here is
+ * what `POST /rooms/:code/join` seats them under; the seat's own id is kept per room by
+ * `@/lib/room-membership`, because one browser can hold a seat in several rooms at once.
  */
 
 export const GUEST_NAME_STORAGE_KEY = 'planning-poker:guest-name';
@@ -21,7 +27,11 @@ export const PARTICIPANT_ID_COOKIE = 'pp_participant_id';
 /** A guest identity survives a closed tab but not a forgotten laptop. */
 export const PARTICIPANT_ID_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
-export const MAX_GUEST_NAME_LENGTH = 40;
+/**
+ * Name rules live in `@planning-poker/shared` so the API enforces the exact same ones; they are
+ * re-exported here because this module is where the rest of the web app looks for them.
+ */
+export { isValidGuestName, MAX_GUEST_NAME_LENGTH, normalizeGuestName };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -58,16 +68,6 @@ export function getOrCreateParticipantId(
   const created = generate();
   store.setItem(PARTICIPANT_ID_STORAGE_KEY, created);
   return created;
-}
-
-/** Collapses whitespace and clips to the column's practical limit. */
-export function normalizeGuestName(raw: string): string {
-  return raw.trim().replace(/\s+/g, ' ').slice(0, MAX_GUEST_NAME_LENGTH);
-}
-
-/** `guest_name` has a `char_length(btrim(...)) > 0` CHECK, so blank names never reach the DB. */
-export function isValidGuestName(raw: string): boolean {
-  return normalizeGuestName(raw).length > 0;
 }
 
 export interface GuestIdentity {
