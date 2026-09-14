@@ -1,6 +1,6 @@
 import type { RoundStatus } from '@planning-poker/shared';
 import { expectOne } from './users.js';
-import { isUniqueViolation, type Queryable, type VotingRound } from './types.js';
+import type { Queryable, VotingRound } from './types.js';
 
 interface RoundRow {
   id: string;
@@ -97,23 +97,31 @@ export async function revealRound(db: Queryable, roundId: string): Promise<Votin
  * The room's current round, opening round 1 if the room has none yet.
  *
  * A room is created with its first round (see `routes/rooms.ts`), so in practice this only
- * opens one for a room that predates that — or for a fixture that seeded a room directly. It
- * is not a transaction: two callers racing here both lose nothing, because the loser of the
- * (room_id, round_number) unique index simply re-reads the round the winner created.
+ * opens one for a room that predates that — or for a fixture that seeded a room directly.
+ * The insert is `ON CONFLICT DO NOTHING` rather than left to throw: a caller may run this inside
+ * its own transaction (e.g. `handleVoteCast`'s `withTransaction`), where a raised unique-violation
+ * would abort that transaction and poison every statement after it, including the very re-read
+ * this function needs to recover. A no-op conflict keeps the transaction usable, so the loser of
+ * the (room_id, round_number) race can simply re-read the round the winner created.
  */
 export async function ensureCurrentRound(db: Queryable, roomId: string): Promise<VotingRound> {
   const existing = await findCurrentRound(db, roomId);
   if (existing) return existing;
 
-  try {
-    return await createRound(db, roomId);
-  } catch (error) {
-    if (!isUniqueViolation(error)) throw error;
-    const raced = await findCurrentRound(db, roomId);
-    /* c8 ignore next */
-    if (!raced) throw error;
-    return raced;
-  }
+  const { rows } = await db.query<RoundRow>(
+    `INSERT INTO voting_rounds (room_id, round_number)
+     SELECT $1, COALESCE(MAX(round_number), 0) + 1 FROM voting_rounds WHERE room_id = $1
+     ON CONFLICT (room_id, round_number) DO NOTHING
+     RETURNING ${ROUND_COLUMNS}`,
+    [roomId],
+  );
+  const row = rows[0];
+  if (row) return mapRound(row);
+
+  const raced = await findCurrentRound(db, roomId);
+  /* c8 ignore next */
+  if (!raced) throw new Error('ensureCurrentRound: insert conflicted but no round exists');
+  return raced;
 }
 
 export async function listRounds(db: Queryable, roomId: string): Promise<VotingRound[]> {
