@@ -30,7 +30,7 @@ describe('room REST API', () => {
   beforeAll(async () => {
     vi.spyOn(config, 'nextAuthSecret', 'get').mockReturnValue(NEXTAUTH_SECRET);
     db = getPool();
-    await runMigrations(db);
+    await runMigrations();
     app = createApp({ pool: db });
   });
 
