@@ -67,7 +67,10 @@ export async function findRoundById(db: Queryable, id: string): Promise<VotingRo
  * guard against voting into an already-revealed round). Callers outside a transaction get no
  * benefit from the lock, but the read itself is still correct.
  */
-export async function lockRoundForUpdate(db: Queryable, roundId: string): Promise<VotingRound | null> {
+export async function lockRoundForUpdate(
+  db: Queryable,
+  roundId: string,
+): Promise<VotingRound | null> {
   const { rows } = await db.query<RoundRow>(
     `SELECT ${ROUND_COLUMNS} FROM voting_rounds WHERE id = $1 FOR UPDATE`,
     [roundId],

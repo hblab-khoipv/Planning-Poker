@@ -2,7 +2,7 @@
 
 Real-time story point estimation for agile teams. See [`PRD/PRD_Planning_Poker.md`](PRD/PRD_Planning_Poker.md) for the full product spec.
 
-> **Status:** rooms are live. On top of the monorepo layout, CI pipeline, Postgres schema/data-access layer, NextAuth sign-in and the room REST API (`POST /rooms`, `GET /rooms/:code`, `POST /rooms/:code/join`, `GET /rooms/:code/participants`), the participant list is now pushed over Socket.io instead of polled: people appear and grey out as they connect and disconnect, without a refresh. Voting, reveal and session history are implemented in follow-up tasks.
+> **Status:** the core voting flow is live. On top of the monorepo layout, CI pipeline, Postgres schema/data-access layer, NextAuth sign-in and the room REST API, participants pick a card from their room's deck, the host reveals everyone's vote plus average/median/consensus, and the host can start a new round — all pushed over Socket.io, with vote values never leaving the server until reveal. Session history is implemented in a follow-up task.
 
 ## Stack
 
@@ -113,14 +113,15 @@ sequential id (PRD §10), and seats the creator in the same transaction — as h
 signed in. Joining is idempotent on both sides: a signed-in user is matched on `user_id` by the
 partial unique index from task 2, and a guest's browser re-presents the `room_participants.id`
 it stored for that room (`apps/web/src/lib/room-membership.ts`), so a reload never costs a second
-seat — or, from task 6, a second vote.
+seat — or a second vote.
 
-| Endpoint                        | Purpose                                                      |
-| ------------------------------- | ------------------------------------------------------------ |
-| `POST /rooms`                   | Create a room and seat the creator (FR-1)                    |
-| `GET /rooms/:code`              | Resolve a join code, so a mistyped one fails before the name |
-| `POST /rooms/:code/join`        | Take a seat in the room (FR-2)                               |
-| `GET /rooms/:code/participants` | The participant list (FR-3), also readable over the socket   |
+| Endpoint                        | Purpose                                                              |
+| ------------------------------- | -------------------------------------------------------------------- |
+| `POST /rooms`                   | Create a room and seat the creator (FR-1)                            |
+| `GET /rooms/:code`              | Resolve a join code, so a mistyped one fails before the name         |
+| `POST /rooms/:code/join`        | Take a seat in the room (FR-2)                                       |
+| `GET /rooms/:code/participants` | The participant list (FR-3), also readable over the socket           |
+| `GET /rooms/:code/round`        | The current round (FR-4/FR-6) — vote values only once it is revealed |
 
 Screens: `/` (create or enter a code), `/rooms/new`, `/join` → `/join/[code]`, `/rooms/[code]`.
 
@@ -133,17 +134,21 @@ REST routes read and a guest from the seat id their browser stored for that room
 resolves to no seat is refused at the handshake, before it can join a channel
 (`apps/api/src/realtime/identity.ts`). One Socket.io room per room code keeps rooms apart.
 
-| Event                | Direction       | Payload                                             |
-| -------------------- | --------------- | --------------------------------------------------- |
-| `room:state`         | server → socket | The room's full participant list, on connect        |
-| `participant:joined` | server → room   | The seat that just came online (PRD §8)             |
-| `participant:left`   | server → room   | `participant_id`, after the reconnect grace window  |
-| `vote:cast`          | server → room   | `participant_id`, `has_voted: true` — never a value |
+| Event                | Direction                           | Payload                                                            |
+| -------------------- | ----------------------------------- | ------------------------------------------------------------------ |
+| `room:state`         | server → socket                     | Full round state plus participant list and `myVote`, on connect    |
+| `participant:joined` | server → room                       | The seat that just came online (PRD §8)                            |
+| `participant:left`   | server → room                       | `participant_id`, after the reconnect grace window                 |
+| `vote:cast`          | server → room                       | `participant_id`, `has_voted: true` — never a value                |
+| `vote:cast`          | client → server                     | `value` — the chosen card; rejected if not in the room's deck      |
+| `round:reveal`       | client → server                     | Host-only; no payload                                              |
+| `round:revealed`     | server → room                       | Every vote's real value, plus average/median/consensus (FR-5/FR-6) |
+| `round:reset`        | client → server, then server → room | Host-only; broadcasts the new `voting_rounds` row (FR-7)           |
 
-`vote:cast` exists but nothing emits it yet: task 6 owns vote casting. Its shape is fixed now on
-purpose — every broadcast this server can make goes through `apps/api/src/realtime/channel.ts`,
-and none of those functions has a parameter a vote value could arrive through, so FR-4's secrecy
-cannot be lost to an accidental payload field later.
+Every broadcast this server can make goes through `apps/api/src/realtime/channel.ts`, and none of
+those functions has a parameter a vote value could arrive through before reveal — that is what
+keeps FR-4's secrecy from being lost to an accidental payload field later. The one payload that
+does carry a card pre-reveal is `room:state.myVote`, sent only to the socket whose own vote it is.
 
 Presence is the one piece of state the socket layer owns. Connecting sets
 `room_participants.is_online`; a disconnect only clears it after `SOCKET_DISCONNECT_GRACE_MS`, so
