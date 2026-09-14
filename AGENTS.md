@@ -57,6 +57,22 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   id and the browser stores it **per room** (`apps/web/src/lib/room-membership.ts`) — one browser
   can hold seats in several rooms, so the single `participant_id` from the guest identity cannot
   be the `room_participants.id`.
+- Realtime lives in `apps/api/src/realtime/`, alongside REST rather than instead of it: REST still
+  creates rooms and seats people, and a socket may only pick up a seat that already exists.
+  `identity.ts` resolves a handshake (NextAuth cookie for members, stored seat id for guests) and
+  refuses anything else _before_ `connection` fires, so an unauthenticated socket never joins a
+  channel. It takes a `ParticipantLookup`, not a pool, which is what makes that decision unit
+  testable without a database.
+- Every server→room broadcast goes through `realtime/channel.ts`. That is deliberate: `vote:cast`
+  is built there from a participant id and there is no parameter a vote value could arrive
+  through, which is how FR-4's secrecy survives task 6. Do not emit to a room from anywhere else.
+- Presence is connection-counted, not event-counted (`realtime/presence.ts`): several sockets per
+  seat (second tab, reload overlap) announce one join, and the last one closing only counts as a
+  departure after `SOCKET_DISCONNECT_GRACE_MS` (default 5s). That window is PRD §12's
+  reconnect question answered; the integration suite shrinks it via `attachRealtime`'s `graceMs`.
+- `room_participants.is_online` is written by the socket layer on connect and on a grace-expired
+  disconnect, so `GET /rooms/:code/participants` and the socket stream cannot disagree. A seat is
+  never deleted on disconnect — it still holds a vote.
 - Integration tests get fixtures from `apps/api/tests/helpers/seed.ts` (`seedRoomWithRound`,
   `truncateAll`); they build rows through the real repositories, so use them rather than raw INSERTs.
 

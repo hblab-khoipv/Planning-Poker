@@ -215,3 +215,23 @@ export async function renameParticipant(
   const row = rows[0];
   return row ? mapParticipant(row) : null;
 }
+
+/**
+ * The seat a signed-in user holds in one room. The socket layer needs it: a returning member
+ * presents no participant id (the server keys them on `user_id`), so this is how a connection
+ * resolves to the seat `POST /rooms/:code/join` already created for them.
+ */
+export async function findParticipantByUserInRoom(
+  db: Queryable,
+  roomId: string,
+  userId: string,
+): Promise<Participant | null> {
+  if (!UUID_PATTERN.test(userId)) return null;
+
+  const { rows } = await db.query<ParticipantRow>(
+    `SELECT ${PARTICIPANT_COLUMNS} FROM room_participants WHERE room_id = $1 AND user_id = $2`,
+    [roomId, userId],
+  );
+  const row = rows[0];
+  return row ? mapParticipant(row) : null;
+}

@@ -48,14 +48,18 @@ export function readSessionToken(header: string | undefined): string | null {
 }
 
 /**
- * Returns the signed-in caller, or null for a guest (no cookie, expired or tampered token, or
- * no shared secret). Never throws: a bad cookie is a guest, not a 500.
+ * Returns the signed-in caller behind a raw `Cookie` header, or null for a guest (no cookie,
+ * expired or tampered token, or no shared secret). Never throws: a bad cookie is a guest, not a
+ * 500. Split out from `resolveCaller` because a Socket.io handshake is not an Express request
+ * but carries the very same cookie (`apps/api/src/realtime/identity.ts`).
  */
-export async function resolveCaller(req: Request): Promise<CallerIdentity | null> {
+export async function resolveCallerFromCookieHeader(
+  header: string | undefined,
+): Promise<CallerIdentity | null> {
   const secret = config.nextAuthSecret;
   if (!secret) return null;
 
-  const token = readSessionToken(req.headers.cookie);
+  const token = readSessionToken(header);
   if (!token) return null;
 
   try {
@@ -64,4 +68,9 @@ export async function resolveCaller(req: Request): Promise<CallerIdentity | null
   } catch {
     return null;
   }
+}
+
+/** The same question, asked of an Express request. */
+export async function resolveCaller(req: Request): Promise<CallerIdentity | null> {
+  return resolveCallerFromCookieHeader(req.headers.cookie);
 }

@@ -2,7 +2,7 @@
 
 Real-time story point estimation for agile teams. See [`PRD/PRD_Planning_Poker.md`](PRD/PRD_Planning_Poker.md) for the full product spec.
 
-> **Status:** rooms can be created and joined. On top of the monorepo layout, CI pipeline, Postgres schema/data-access layer and NextAuth sign-in, the app now has the room REST API (`POST /rooms`, `GET /rooms/:code`, `POST /rooms/:code/join`, `GET /rooms/:code/participants`) and the screens for it: home, create room, join room, and a room page with a polled participant list. Realtime sync (Socket.io), voting, reveal and session history are implemented in follow-up tasks.
+> **Status:** rooms are live. On top of the monorepo layout, CI pipeline, Postgres schema/data-access layer, NextAuth sign-in and the room REST API (`POST /rooms`, `GET /rooms/:code`, `POST /rooms/:code/join`, `GET /rooms/:code/participants`), the participant list is now pushed over Socket.io instead of polled: people appear and grey out as they connect and disconnect, without a refresh. Voting, reveal and session history are implemented in follow-up tasks.
 
 ## Stack
 
@@ -120,9 +120,36 @@ seat — or, from task 6, a second vote.
 | `POST /rooms`                   | Create a room and seat the creator (FR-1)                    |
 | `GET /rooms/:code`              | Resolve a join code, so a mistyped one fails before the name |
 | `POST /rooms/:code/join`        | Take a seat in the room (FR-2)                               |
-| `GET /rooms/:code/participants` | The participant list (FR-3, polled until task 5 pushes it)   |
+| `GET /rooms/:code/participants` | The participant list (FR-3), also readable over the socket   |
 
 Screens: `/` (create or enter a code), `/rooms/new`, `/join` → `/join/[code]`, `/rooms/[code]`.
+
+## Realtime (Socket.io)
+
+REST creates rooms and seats people; the socket carries what happens after that. A connection
+never establishes an identity of its own — it picks up one that `POST /rooms/:code/join` already
+wrote to `room_participants`, recognising a signed-in member from the same NextAuth cookie the
+REST routes read and a guest from the seat id their browser stored for that room. Anything that
+resolves to no seat is refused at the handshake, before it can join a channel
+(`apps/api/src/realtime/identity.ts`). One Socket.io room per room code keeps rooms apart.
+
+| Event                | Direction       | Payload                                             |
+| -------------------- | --------------- | --------------------------------------------------- |
+| `room:state`         | server → socket | The room's full participant list, on connect        |
+| `participant:joined` | server → room   | The seat that just came online (PRD §8)             |
+| `participant:left`   | server → room   | `participant_id`, after the reconnect grace window  |
+| `vote:cast`          | server → room   | `participant_id`, `has_voted: true` — never a value |
+
+`vote:cast` exists but nothing emits it yet: task 6 owns vote casting. Its shape is fixed now on
+purpose — every broadcast this server can make goes through `apps/api/src/realtime/channel.ts`,
+and none of those functions has a parameter a vote value could arrive through, so FR-4's secrecy
+cannot be lost to an accidental payload field later.
+
+Presence is the one piece of state the socket layer owns. Connecting sets
+`room_participants.is_online`; a disconnect only clears it after `SOCKET_DISCONNECT_GRACE_MS`, so
+a reload or a brief drop is not a departure (PRD §12) and `GET /rooms/:code/participants` keeps
+agreeing with what the sockets have seen. A seat is greyed out, never removed — it still holds a
+vote.
 
 ## Database
 
@@ -188,7 +215,8 @@ See [`.env.example`](.env.example). Notable ones:
 | ------------------------------------------ | ------- | ----------------------------------------------------------------------------- |
 | `DATABASE_URL`                             | api     | PostgreSQL connection string                                                  |
 | `PORT`                                     | api     | API port (default 4000)                                                       |
-| `CORS_ORIGIN`                              | api     | Allowed browser origins, comma-separated (default: the web dev URLs)          |
+| `CORS_ORIGIN`                              | api     | Allowed browser origins for REST and Socket.io, comma-separated               |
+| `SOCKET_DISCONNECT_GRACE_MS`               | api     | Reconnect window before a dropped socket counts as leaving (default 5000)     |
 | `NEXT_PUBLIC_API_URL`                      | web     | API base URL exposed to the browser                                           |
 | `NEXTAUTH_URL`, `NEXTAUTH_SECRET`          | web+api | NextAuth — required; the API verifies the session cookie with the same secret |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | web     | Google sign-in; leave empty to run with email/password only                   |
