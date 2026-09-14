@@ -58,3 +58,21 @@ Nothing is reloaded between shots — every change is an event arriving on an op
 | `realtime-02-after-lan.png`  | **After,** same tab, never reloaded: Minh appeared the moment browser B joined. This is `participant:joined` arriving on the open socket.                     |
 | `realtime-03-after-minh.png` | Browser B at the same moment: its `room:state` snapshot already contains Khôi and Lan, so a newcomer is never missing the people who were there first.        |
 | `realtime-04-left-lan.png`   | Browser B closed. After the grace window, browser A shows Minh as “Ngoại tuyến” — `participant:left`, with `room_participants.is_online` flipped in Postgres. |
+
+## Task 6 — voting, reveal and new rounds
+
+Three independent browser contexts (separate storage, so three different people) in one room,
+driven by Playwright against the real API, the real Socket.io server and the real database.
+Nothing is reloaded between shots — every change is an event arriving on an open socket.
+
+| File                             | What it shows                                                                                                                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `voting-01-deck-host.png`        | Round 1 open (PRD §4 step 5): the room's own `fibonacci` deck, nobody has voted, and the host sees “Lộ bài”.                                                             |
+| `voting-02-voted-hidden-lan.png` | **FR-4.** All three have voted. Lan sees her own `5` selected and everyone else only as “Đã chọn” — no value of anyone else's is anywhere on her page, and no host control. |
+| `voting-03-voted-hidden-host.png`| The same moment on the host's screen: the host is no more privileged than Lan before the reveal.                                                                           |
+| `voting-04-revealed-host.png`    | **FR-5/FR-6.** The host pressed “Lộ bài”: every card up (2, 5, 8), trung bình 5, median 5, 3 lượt vote, and no consensus badge.                                          |
+| `voting-05-revealed-lan.png`     | The same values and the same numbers on Lan's screen — the reveal is a broadcast, not a host-local view.                                                                  |
+| `voting-06-new-round-lan.png`    | **FR-7.** After “Task tiếp theo / Round mới”: round 2, deck open again, and every trace of round 1 gone — no results, no values, nobody marked as having voted.          |
+| `voting-07-consensus-minh.png`   | Round 2 reached consensus on 13: the “Đồng thuận” badge, with trung bình/median 13. Reached in round 2, so round 1's values provably cannot have fed this tally.         |
+| `voting-08-non-host-lan.png`     | A non-host in a `tshirt` room: the deck is the room's own (sizes, no numbers) and there is no reveal or reset control on the page at all.                                  |
+| `voting-09-tshirt-revealed.png`  | A t-shirt reveal: consensus works, and average/median are deliberately absent — FR-6 scopes them to numeric decks.                                                        |
