@@ -5,10 +5,28 @@ function optionalNumber(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+/**
+ * CORS_ORIGIN accepts a comma-separated list: the browser reaches the app on more than one
+ * hostname in practice (localhost and 127.0.0.1 are different origins to a browser, and the
+ * e2e run uses the latter).
+ */
+function originList(value: string | undefined, fallback: string[]): string[] {
+  const entries = (value ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  return entries.length > 0 ? entries : fallback;
+}
+
 export const config = {
   port: optionalNumber(process.env.PORT, 4000),
-  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+  corsOrigin: originList(process.env.CORS_ORIGIN, [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+  ]),
   databaseUrl:
     process.env.DATABASE_URL ??
     'postgresql://planning_poker:planning_poker@localhost:5432/planning_poker',
+  /** Shared with apps/web so the API can verify NextAuth's session cookie (see http/session.ts). */
+  nextAuthSecret: process.env.NEXTAUTH_SECRET ?? '',
 } as const;
