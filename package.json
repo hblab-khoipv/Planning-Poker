@@ -20,9 +20,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
-    "test:unit": "npm run test:unit --workspaces --if-present",
-    "test:integration": "npm run test:integration --workspaces --if-present",
-    "test:e2e": "npm run test:e2e --workspace @planning-poker/web"
+    "test:unit": "npm run build:shared && npm run test:unit --workspaces --if-present",
+    "test:integration": "npm run build:shared && npm run test:integration --workspaces --if-present",
+    "test:e2e": "npm run build:shared && npm run test:e2e --workspace @planning-poker/web"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
