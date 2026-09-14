@@ -4,27 +4,39 @@ import {
   DECKS,
   joinPath,
   type ParticipantDto,
+  type ParticipantJoinedPayload,
+  type ParticipantLeftPayload,
   parseRoomCode,
   type RoomDto,
+  type RoomStatePayload,
 } from '@planning-poker/shared';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { InviteLink } from '@/components/invite-link';
 import { ParticipantList } from '@/components/participant-list';
 import { fetchParticipants, fetchRoom, messageForError } from '@/lib/api-client';
 import { browserIdentityStore } from '@/lib/guest-identity';
 import { readRoomMembership } from '@/lib/room-membership';
+import {
+  applyParticipantJoined,
+  applyParticipantLeft,
+  connectToRoom,
+  SOCKET_EVENTS,
+} from '@/lib/room-socket';
 
 /**
- * The room screen (PRD §9.4), with only the parts task 4 owns: the room's identity, the invite
- * link and the participant list.
+ * The room screen (PRD §9.4): the room's identity, the invite link, and a participant list that
+ * is now pushed rather than polled (FR-3).
  *
- * The list is polled. Task 5 replaces `POLL_INTERVAL_MS` with the Socket.io stream (FR-3's
- * "real-time"); the cards, reveal and results areas arrive with tasks 5-6.
+ * Two ways in, on purpose. Somebody who has joined holds a seat, so they open a socket and the
+ * list stays live — the snapshot on connect seeds it, `participant:joined`/`participant:left`
+ * keep it current. Somebody who only followed the invite link has no seat yet; the API refuses
+ * them a socket (a connection may never invent a participant), so they get a single REST read
+ * and a prompt to join. The cards, reveal and results areas arrive with task 6.
  */
 
-const POLL_INTERVAL_MS = 3000;
+type ConnectionState = 'connecting' | 'live' | 'offline';
 
 export default function RoomPage() {
   const params = useParams<{ code: string }>();
@@ -34,17 +46,14 @@ export default function RoomPage() {
   const [participants, setParticipants] = useState<ParticipantDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mySeatId, setMySeatId] = useState<string | null>(null);
+  const [seatChecked, setSeatChecked] = useState(false);
+  const [connection, setConnection] = useState<ConnectionState>('connecting');
 
   useEffect(() => {
     if (!code) return;
     const store = browserIdentityStore();
     setMySeatId(store ? readRoomMembership(store, code) : null);
-  }, [code]);
-
-  const refresh = useCallback(async () => {
-    if (!code) return;
-    const { participants: current } = await fetchParticipants(code);
-    setParticipants(current);
+    setSeatChecked(true);
   }, [code]);
 
   useEffect(() => {
@@ -54,15 +63,9 @@ export default function RoomPage() {
     }
 
     let cancelled = false;
-    let timer: ReturnType<typeof setInterval> | undefined;
-
     fetchRoom(code)
-      .then(async ({ room: found }) => {
-        if (cancelled) return;
-        setRoom(found);
-        await refresh();
-        if (!cancelled)
-          timer = setInterval(() => void refresh().catch(() => undefined), POLL_INTERVAL_MS);
+      .then(({ room: found }) => {
+        if (!cancelled) setRoom(found);
       })
       .catch((caught: unknown) => {
         if (!cancelled) setError(messageForError(caught));
@@ -70,9 +73,51 @@ export default function RoomPage() {
 
     return () => {
       cancelled = true;
-      if (timer) clearInterval(timer);
     };
-  }, [code, refresh]);
+  }, [code]);
+
+  // The live list. Re-runs when the seat appears, so joining in another tab upgrades this one
+  // from the read-only view to the socket without a reload.
+  useEffect(() => {
+    if (!code || !seatChecked) return;
+
+    let cancelled = false;
+
+    if (!mySeatId) {
+      setConnection('offline');
+      void fetchParticipants(code)
+        .then(({ participants: current }) => {
+          if (!cancelled) setParticipants(current);
+        })
+        .catch(() => undefined);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setConnection('connecting');
+    const socket = connectToRoom({ roomCode: code, participantId: mySeatId });
+
+    socket.on('connect', () => setConnection('live'));
+    socket.on('disconnect', () => setConnection('connecting'));
+    socket.on('connect_error', () => setConnection('offline'));
+
+    socket.on(SOCKET_EVENTS.ROOM_STATE, (payload: RoomStatePayload) => {
+      setParticipants(payload.participants);
+    });
+    socket.on(SOCKET_EVENTS.PARTICIPANT_JOINED, (payload: ParticipantJoinedPayload) => {
+      setParticipants((current) => applyParticipantJoined(current, payload.participant));
+    });
+    socket.on(SOCKET_EVENTS.PARTICIPANT_LEFT, (payload: ParticipantLeftPayload) => {
+      setParticipants((current) => applyParticipantLeft(current, payload.participantId));
+    });
+
+    return () => {
+      cancelled = true;
+      socket.removeAllListeners();
+      socket.disconnect();
+    };
+  }, [code, mySeatId, seatChecked]);
 
   if (error) {
     return (
@@ -131,11 +176,15 @@ export default function RoomPage() {
         </p>
       )}
 
-      <ParticipantList participants={participants} currentParticipantId={mySeatId} />
+      <ParticipantList
+        participants={participants}
+        currentParticipantId={mySeatId}
+        connection={mySeatId ? connection : 'none'}
+      />
 
       <p className="text-sm text-slate-500" data-testid="room-next-steps">
-        Danh sách hiện đang được cập nhật bằng polling mỗi {POLL_INTERVAL_MS / 1000} giây; bản
-        real-time qua Socket.io cùng với bộ thẻ, nút “Lộ bài” và kết quả sẽ có ở các bước tiếp theo.
+        Danh sách thành viên đã được đồng bộ real-time qua Socket.io. Bộ thẻ, nút “Lộ bài” và kết
+        quả sẽ có ở bước tiếp theo.
       </p>
     </main>
   );

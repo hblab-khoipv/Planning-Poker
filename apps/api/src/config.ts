@@ -29,4 +29,11 @@ export const config = {
     'postgresql://planning_poker:planning_poker@localhost:5432/planning_poker',
   /** Shared with apps/web so the API can verify NextAuth's session cookie (see http/session.ts). */
   nextAuthSecret: process.env.NEXTAUTH_SECRET ?? '',
+  /**
+   * How long a dropped socket keeps its seat marked online before it counts as having left.
+   * PRD §12 lists reconnect-on-network-drop as an open question; a short window is the
+   * conservative answer — a tab reload or a lift-doors moment does not flush somebody out of
+   * the room, and the only cost is that a genuine departure shows up this many ms late.
+   */
+  socketDisconnectGraceMs: optionalNumber(process.env.SOCKET_DISCONNECT_GRACE_MS, 5000),
 } as const;

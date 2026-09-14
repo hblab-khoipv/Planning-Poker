@@ -108,7 +108,8 @@ test.describe('join a room', () => {
     await otherPage.getByTestId('join-room-submit').click();
     await expect(otherPage.getByTestId('participant-item')).toHaveCount(3);
 
-    // The first tab is polling (task 5 makes this a push), so it catches up on its own.
+    // The first tab holds a room socket, so participant:joined lands without a reload
+    // (realtime.spec.ts is where that is pinned down properly).
     await expect(page.getByTestId('participant-list')).toContainText('Minh');
     await expect(page.getByTestId('participant-item')).toHaveCount(3);
 

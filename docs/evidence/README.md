@@ -34,14 +34,27 @@ Screenshots attached to the pull requests as acceptance evidence.
 
 ## Task 4 — rooms: create & join
 
-| File                                  | What it shows                                                                                                                                             |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `room-01-home.png`                    | Home (PRD §9 screen 1): the "Tạo phòng mới" button and the join-by-code field.                                                                            |
-| `room-02-create-room.png`             | `/rooms/new` (screen 2): room name plus the `fibonacci`/`tshirt` deck choice.                                                                             |
-| `room-03-room-after-create.png`       | The room just created (screen 4): name, code, deck, invite link, and the creator seated as host.                                                          |
-| `room-04-join-by-code.png`            | `/join` (screen 3): typing a room code.                                                                                                                   |
-| `room-05-join-room-guest.png`         | `/join/[code]` after the code resolved to a real room, asking a guest for a display name.                                                                 |
-| `room-06-room-with-guest.png`         | The room once that guest is in: their seat is listed, with `room_participants.user_id` NULL.                                                              |
-| `room-07-join-room-authenticated.png` | The same screen for a signed-in visitor: the account name is prefilled, and they may still rename themselves for this one room.                           |
-| `room-08-room-with-participants.png`  | Three real seats in one room — host, a guest, and a signed-in user — exactly what `GET /rooms/:code/participants` returns (polled every 3s until task 5). |
-| `room-09-join-unknown-code.png`       | An unknown code: a clear error at lookup time, before anyone is asked for a name, and no `room_participants` row written.                                 |
+| File                                  | What it shows                                                                                                                                                                                   |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `room-01-home.png`                    | Home (PRD §9 screen 1): the "Tạo phòng mới" button and the join-by-code field.                                                                                                                  |
+| `room-02-create-room.png`             | `/rooms/new` (screen 2): room name plus the `fibonacci`/`tshirt` deck choice.                                                                                                                   |
+| `room-03-room-after-create.png`       | The room just created (screen 4): name, code, deck, invite link, and the creator seated as host.                                                                                                |
+| `room-04-join-by-code.png`            | `/join` (screen 3): typing a room code.                                                                                                                                                         |
+| `room-05-join-room-guest.png`         | `/join/[code]` after the code resolved to a real room, asking a guest for a display name.                                                                                                       |
+| `room-06-room-with-guest.png`         | The room once that guest is in: their seat is listed, with `room_participants.user_id` NULL.                                                                                                    |
+| `room-07-join-room-authenticated.png` | The same screen for a signed-in visitor: the account name is prefilled, and they may still rename themselves for this one room.                                                                 |
+| `room-08-room-with-participants.png`  | Three real seats in one room — host, a guest, and a signed-in user — exactly what `GET /rooms/:code/participants` returns (polled every 3s; task 5 below replaces the poll with a socket push). |
+| `room-09-join-unknown-code.png`       | An unknown code: a clear error at lookup time, before anyone is asked for a name, and no `room_participants` row written.                                                                       |
+
+## Task 5 — realtime rooms (Socket.io)
+
+Two independent browser contexts (separate localStorage, so two different guests) in one room,
+driven by Playwright against the real API, the real Socket.io server and the real database.
+Nothing is reloaded between shots — every change is an event arriving on an open socket.
+
+| File                         | What it shows                                                                                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `realtime-01-before-lan.png` | **Before.** Browser A (Lan) has joined; the list holds two seats and the badge reads “Trực tiếp” — the socket handshake was accepted.                         |
+| `realtime-02-after-lan.png`  | **After,** same tab, never reloaded: Minh appeared the moment browser B joined. This is `participant:joined` arriving on the open socket.                     |
+| `realtime-03-after-minh.png` | Browser B at the same moment: its `room:state` snapshot already contains Khôi and Lan, so a newcomer is never missing the people who were there first.        |
+| `realtime-04-left-lan.png`   | Browser B closed. After the grace window, browser A shows Minh as “Ngoại tuyến” — `participant:left`, with `room_participants.is_online` flipped in Postgres. |
