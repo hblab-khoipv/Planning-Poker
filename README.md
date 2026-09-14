@@ -2,7 +2,7 @@
 
 Real-time story point estimation for agile teams. See [`PRD/PRD_Planning_Poker.md`](PRD/PRD_Planning_Poker.md) for the full product spec.
 
-> **Status:** scaffolding only. This repository currently contains the monorepo layout, tooling and CI pipeline. Rooms, voting, realtime sync, auth and session history are implemented in follow-up tasks.
+> **Status:** data layer only. This repository contains the monorepo layout, tooling, CI pipeline, and the Postgres schema/migrations plus typed data-access layer for rooms, participants, rounds and votes. REST endpoints, realtime sync, auth wiring and the UI are implemented in follow-up tasks.
 
 ## Stack
 
