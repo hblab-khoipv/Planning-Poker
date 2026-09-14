@@ -16,6 +16,16 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 - Lint/typecheck/unit/integration/e2e are five separate CI jobs in `.github/workflows/ci.yml`;
   each maps to a root npm script of the same name. Add test files to the existing directories
   rather than changing CI plumbing.
+- Data access goes through `apps/api/src/db/repositories/` (plain typed `pg` query functions, no ORM).
+  Every function takes a `Queryable` first argument, so callers pass the pool or one checked-out
+  client to compose several writes into a transaction; repositories never BEGIN/COMMIT themselves.
+- `users`/`accounts`/`sessions`/`verification_token` follow `@auth/pg-adapter`'s required column
+  names verbatim (quoted camelCase included) so task 3 can drop NextAuth in. Two consequences:
+  PRD §7's `display_name` is the adapter's `name` column, mapped to `displayName` only in TypeScript,
+  and ids are `uuid` rather than the adapter docs' `SERIAL` — safe because the adapter never supplies
+  an id on insert. Do not rename these columns to match the PRD.
+- Integration tests get fixtures from `apps/api/tests/helpers/seed.ts` (`seedRoomWithRound`,
+  `truncateAll`); they build rows through the real repositories, so use them rather than raw INSERTs.
 
 ## Maintaining this file
 
