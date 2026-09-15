@@ -4,6 +4,7 @@ import {
   apiBaseUrl,
   apiUrl,
   DEFAULT_API_BASE_URL,
+  DEFAULT_API_PORT,
   messageForError,
 } from '@/lib/api-client';
 
@@ -25,6 +26,22 @@ describe('apiBaseUrl', () => {
     process.env.NEXT_PUBLIC_API_URL = '   ';
 
     expect(apiBaseUrl()).toBe(DEFAULT_API_BASE_URL);
+  });
+
+  /**
+   * The bug this guards against is invisible in the happy path: cookies are scoped to a host and
+   * ignore the port, so a page on 127.0.0.1 calling an API on `localhost` sends no session
+   * cookie and every authenticated read (session history) comes back 401.
+   */
+  it('takes the host from the page when nothing is configured', () => {
+    delete process.env.NEXT_PUBLIC_API_URL;
+    vi.stubGlobal('window', {
+      location: { protocol: 'http:', hostname: '127.0.0.1' },
+    });
+
+    expect(apiBaseUrl()).toBe(`http://127.0.0.1:${DEFAULT_API_PORT}`);
+
+    vi.unstubAllGlobals();
   });
 
   it('drops a trailing slash so paths do not end up doubled', () => {

@@ -5,6 +5,7 @@ import { config } from './config.js';
 import { getPool } from './db/pool.js';
 import { errorBody, errorHandler } from './http/errors.js';
 import { createRoomsRouter } from './routes/rooms.js';
+import { createUsersRouter } from './routes/users.js';
 
 export interface HealthResponse {
   status: 'ok';
@@ -49,6 +50,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   });
 
   app.use('/rooms', createRoomsRouter(pool));
+  app.use('/users', createUsersRouter(pool));
 
   app.use((_req, res) => {
     res.status(404).json(errorBody('not_found', 'route not found'));

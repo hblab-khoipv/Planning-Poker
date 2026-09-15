@@ -1,5 +1,6 @@
 export * from './decks.js';
 export * from './events.js';
+export * from './history.js';
 export * from './participants.js';
 export * from './room-code.js';
 export * from './rooms.js';

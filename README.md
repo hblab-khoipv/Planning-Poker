@@ -2,7 +2,7 @@
 
 Real-time story point estimation for agile teams. See [`PRD/PRD_Planning_Poker.md`](PRD/PRD_Planning_Poker.md) for the full product spec.
 
-> **Status:** the core voting flow is live. On top of the monorepo layout, CI pipeline, Postgres schema/data-access layer, NextAuth sign-in and the room REST API, participants pick a card from their room's deck, the host reveals everyone's vote plus average/median/consensus, and the host can start a new round — all pushed over Socket.io, with vote values never leaving the server until reveal. Session history is implemented in a follow-up task.
+> **Status:** the MVP flow is live end to end. On top of the monorepo layout, CI pipeline, Postgres schema/data-access layer, NextAuth sign-in and the room REST API, participants pick a card from their room's deck, the host reveals everyone's vote plus average/median/consensus, and the host can start a new round — all pushed over Socket.io, with vote values never leaving the server until reveal. Signed-in users can then read those sessions back from the history screens; guests have no history, by design.
 
 ## Stack
 
@@ -124,6 +124,30 @@ seat — or a second vote.
 | `GET /rooms/:code/round`        | The current round (FR-4/FR-6) — vote values only once it is revealed |
 
 Screens: `/` (create or enter a code), `/rooms/new`, `/join` → `/join/[code]`, `/rooms/[code]`.
+
+## Session history
+
+FR-9 exists for accounts only. A guest is identified by a `participant_id` their own browser holds
+for one room, so there is nothing to attach a list of past sessions to — and honouring such an id
+would turn a leaked seat id into a key to that room's past votes. Both endpoints therefore resolve
+membership through `room_participants.user_id`, which no guest seat ever matches.
+
+| Endpoint                  | Purpose                                                                |
+| ------------------------- | ---------------------------------------------------------------------- |
+| `GET /users/me/rooms`     | Rooms this account created or joined, newest activity first (FR-9)     |
+| `GET /rooms/:code/rounds` | One room's rounds and their results — members of that room only (FR-9) |
+
+`/users/me/...` rather than `/users/:id/...` is the authorisation model: there is no id in the URL
+to tamper with, so the only account these routes can read is the one the session cookie decrypts
+to. A guest gets 401 and a signed-in stranger 403 — different answers, because the screens show
+"đăng nhập để xem lịch sử" for one and "this session is not yours" for the other.
+
+Round results are not recomputed for history: every entry goes through the same `toRoundStateDto`
+the live room uses, so a round still `voting` when everybody went home has its cards withheld here
+too. FR-4's secrecy does not lapse once a meeting is over.
+
+Screens: `/history` (PRD §9.6) and `/history/[code]`. The way in is the signed-in half of
+`AuthStatus`, so the UI does not exist for a guest at all.
 
 ## Realtime (Socket.io)
 
