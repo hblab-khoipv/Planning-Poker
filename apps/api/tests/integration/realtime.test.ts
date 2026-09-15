@@ -91,17 +91,34 @@ describe('realtime participant presence', () => {
     });
   }
 
-  /** Resolves with the first payload of `event`, or rejects rather than hanging the suite. */
-  function nextEvent<T>(socket: ClientSocket, event: string, timeoutMs = 5000): Promise<T> {
+  /**
+   * Resolves with the first payload of `event` that `matches`, or rejects rather than hanging
+   * the suite.
+   *
+   * The predicate is not decoration. A socket is in the room it is announcing itself to, so it
+   * receives its *own* `participant:joined` right after its `room:state` — and whether that
+   * arrival lands before or after a listener attached in the `room:state` continuation is a
+   * race. Without a predicate, a test waiting for somebody else's arrival sometimes catches
+   * its own instead.
+   */
+  function nextEvent<T>(
+    socket: ClientSocket,
+    event: string,
+    options: { timeoutMs?: number; matches?: (payload: T) => boolean } = {},
+  ): Promise<T> {
+    const { timeoutMs = 5000, matches } = options;
     return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error(`timed out waiting for ${event}`)),
-        timeoutMs,
-      );
-      socket.once(event, (payload: T) => {
+      const timer = setTimeout(() => {
+        socket.off(event, listener);
+        reject(new Error(`timed out waiting for ${event}`));
+      }, timeoutMs);
+      const listener = (payload: T): void => {
+        if (matches && !matches(payload)) return;
         clearTimeout(timer);
+        socket.off(event, listener);
         resolve(payload);
-      });
+      };
+      socket.on(event, listener);
     });
   }
 
@@ -172,6 +189,7 @@ describe('realtime participant presence', () => {
       const seesGuestJoin = nextEvent<ParticipantJoinedPayload>(
         first,
         SOCKET_EVENTS.PARTICIPANT_JOINED,
+        { matches: (payload) => payload.participant.id === guest.id },
       );
       const second = await open({ roomCode: room.code, participantId: guest.id });
       const secondState = await nextEvent<RoomStatePayload>(second, SOCKET_EVENTS.ROOM_STATE);
@@ -206,11 +224,20 @@ describe('realtime participant presence', () => {
       const bystander = await addParticipant(db, { roomId: other.id, guestName: 'Minh' });
 
       const watcher = await open({ roomCode: other.code, participantId: bystander.id });
-      await nextEvent<RoomStatePayload>(watcher, SOCKET_EVENTS.ROOM_STATE);
 
+      // Attached before the snapshot is awaited, and blind to the watcher's own seat. A socket
+      // is in the room it announces itself to, so its own `participant:joined` can arrive on
+      // either side of `room:state`; counting it would make this a coin toss rather than a
+      // check that nothing crosses between rooms.
       const leaked = vi.fn();
-      watcher.on(SOCKET_EVENTS.PARTICIPANT_JOINED, leaked);
-      watcher.on(SOCKET_EVENTS.PARTICIPANT_LEFT, leaked);
+      const ignoringSelf = (payload: ParticipantJoinedPayload | ParticipantLeftPayload): void => {
+        const id = 'participant' in payload ? payload.participant.id : payload.participantId;
+        if (id !== bystander.id) leaked(payload);
+      };
+      watcher.on(SOCKET_EVENTS.PARTICIPANT_JOINED, ignoringSelf);
+      watcher.on(SOCKET_EVENTS.PARTICIPANT_LEFT, ignoringSelf);
+
+      await nextEvent<RoomStatePayload>(watcher, SOCKET_EVENTS.ROOM_STATE);
 
       const joiner = await open({ roomCode: room.code, participantId: host.id });
       await nextEvent<RoomStatePayload>(joiner, SOCKET_EVENTS.ROOM_STATE);
@@ -227,7 +254,9 @@ describe('realtime participant presence', () => {
       await nextEvent<RoomStatePayload>(watcher, SOCKET_EVENTS.ROOM_STATE);
 
       const first = await open({ roomCode: room.code, participantId: guest.id });
-      await nextEvent<ParticipantJoinedPayload>(watcher, SOCKET_EVENTS.PARTICIPANT_JOINED);
+      await nextEvent<ParticipantJoinedPayload>(watcher, SOCKET_EVENTS.PARTICIPANT_JOINED, {
+        matches: (payload) => payload.participant.id === guest.id,
+      });
 
       const churn = vi.fn();
       watcher.on(SOCKET_EVENTS.PARTICIPANT_LEFT, churn);
