@@ -6,6 +6,7 @@ import {
   listParticipantsWithUsers,
   setParticipantOnline,
 } from '../db/repositories/participants.js';
+import { touchRoom } from '../db/repositories/rooms.js';
 import { ensureCurrentRound } from '../db/repositories/rounds.js';
 import type { Participant, Queryable, Room } from '../db/repositories/types.js';
 import { findVoteForParticipant, listVotesForRound } from '../db/repositories/votes.js';
@@ -89,6 +90,9 @@ export function attachRealtime(
 
       const announce = presence.attach(participant.id, socket.id);
       await setParticipantOnline(pool, participant.id, true);
+      // Somebody being in the room is activity, which keeps the idle sweep (jobs/room-cleanup.ts)
+      // from reclaiming a room under people who reload the page without re-joining over REST.
+      await touchRoom(pool, room.id);
 
       // The snapshot goes out before the join is announced, so this socket's own list already
       // contains everybody by the time it starts applying events to it.

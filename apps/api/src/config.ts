@@ -36,4 +36,17 @@ export const config = {
    * the room, and the only cost is that a genuine departure shows up this many ms late.
    */
   socketDisconnectGraceMs: optionalNumber(process.env.SOCKET_DISCONNECT_GRACE_MS, 5000),
+  /**
+   * How long a room may sit with no activity before the sweep deletes it and its participants,
+   * rounds and votes (PRD §3.1.9 / FR-10). 24h is the PRD's own figure; it is configurable so a
+   * staging box can be told to reclaim rooms sooner without a code change.
+   */
+  roomIdleHours: optionalNumber(process.env.ROOM_IDLE_HOURS, 24),
+  /**
+   * How often that sweep runs. Minutes, not seconds: nothing depends on a room disappearing
+   * punctually, and the query is a full-table DELETE on an indexed column.
+   */
+  roomCleanupIntervalMs: optionalNumber(process.env.ROOM_CLEANUP_INTERVAL_MS, 5 * 60 * 1000),
+  /** Set ROOM_CLEANUP_ENABLED=false to run a box that never deletes rooms (e.g. while debugging). */
+  roomCleanupEnabled: process.env.ROOM_CLEANUP_ENABLED !== 'false',
 } as const;

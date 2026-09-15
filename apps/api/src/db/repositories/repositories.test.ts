@@ -3,7 +3,7 @@ import { assertParticipantIdentity, GUEST_NAME_MAX_LENGTH } from './participants
 import {
   assertValidRoomName,
   createRoom,
-  deleteRoomsIdleSince,
+  deleteRoomsIdleBefore,
   findRoomByCode,
   ROOM_NAME_MAX_LENGTH,
 } from './rooms.js';
@@ -194,23 +194,38 @@ describe('findRoomByCode', () => {
   });
 });
 
-describe('deleteRoomsIdleSince', () => {
-  it('passes the cutoff as an interval and reports how many rooms went', async () => {
-    const db = new FakeDb([{ rows: [], rowCount: 3 }]);
+describe('deleteRoomsIdleBefore', () => {
+  it('deletes by the cutoff it is given and reports the rooms that went', async () => {
+    const cutoff = new Date('2026-09-14T00:00:00.000Z');
+    const lastActiveAt = new Date('2026-09-10T08:30:00.000Z');
+    const db = new FakeDb([
+      { rows: [{ id: 'room-1', code: 'AB12CD34', last_active_at: lastActiveAt }] },
+    ]);
 
-    await expect(deleteRoomsIdleSince(db, 24)).resolves.toBe(3);
-    expect(db.lastCall.values).toEqual(['24']);
+    await expect(deleteRoomsIdleBefore(db, cutoff)).resolves.toEqual([
+      { id: 'room-1', code: 'AB12CD34', lastActiveAt },
+    ]);
+    expect(db.lastCall.values).toEqual([cutoff]);
+    // Only `rooms` may be named: everything else goes by ON DELETE CASCADE, and users/accounts/
+    // sessions are permanent (PRD §7).
+    expect(db.lastCall.text).toContain('DELETE FROM rooms');
+    for (const table of ['users', 'accounts', 'sessions']) {
+      expect(db.lastCall.text).not.toContain(table);
+    }
   });
 
-  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
-    'rejects the non-positive window %p',
-    async (hours) => {
-      const db = new FakeDb([]);
+  it('reports an empty sweep as no rooms rather than as a failure', async () => {
+    const db = new FakeDb([{ rows: [] }]);
 
-      await expect(deleteRoomsIdleSince(db, hours)).rejects.toThrow(ValidationError);
-      expect(db.calls).toHaveLength(0);
-    },
-  );
+    await expect(deleteRoomsIdleBefore(db, new Date())).resolves.toEqual([]);
+  });
+
+  it('rejects an invalid cutoff without touching the database', async () => {
+    const db = new FakeDb([]);
+
+    await expect(deleteRoomsIdleBefore(db, new Date(Number.NaN))).rejects.toThrow(ValidationError);
+    expect(db.calls).toHaveLength(0);
+  });
 });
 
 describe('assertParticipantIdentity', () => {
