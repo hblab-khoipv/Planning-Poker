@@ -11,6 +11,7 @@ import {
   createUser,
   deleteRoomsIdleSince,
   deleteVote,
+  ensureCurrentRound,
   findCurrentRound,
   findParticipantById,
   findRoomByCode,
@@ -26,6 +27,7 @@ import {
   touchRoom,
   ValidationError,
 } from '../../src/db/repositories/index.js';
+import { withTransaction } from '../../src/db/transaction.js';
 import { seedGuest, seedRoom, seedRoomWithRound, seedUser, truncateAll } from '../helpers/seed.js';
 
 /**
@@ -403,6 +405,23 @@ describe('data layer against Postgres', () => {
       await expect(createRound(db, '00000000-0000-0000-0000-000000000000')).rejects.toThrow(
         /voting_rounds_room_id_fkey/,
       );
+    });
+
+    it('lets two callers race the first round open, one of them inside its own transaction', async () => {
+      const room = await seedRoom(db);
+
+      // Mirrors handleVoteCast: one caller runs ensureCurrentRound on a transaction client, the
+      // other on the bare pool, both finding no round yet and racing to insert round 1. Neither
+      // may throw — a caller inside a transaction that hit a raw unique-violation here would have
+      // its whole transaction aborted, poisoning the very re-read meant to recover from the race.
+      const [fromTransaction, standalone] = await Promise.all([
+        withTransaction(db, (client) => ensureCurrentRound(client, room.id)),
+        ensureCurrentRound(db, room.id),
+      ]);
+
+      expect(fromTransaction.id).toBe(standalone.id);
+      expect(fromTransaction.roundNumber).toBe(1);
+      await expect(listRounds(db, room.id)).resolves.toHaveLength(1);
     });
   });
 

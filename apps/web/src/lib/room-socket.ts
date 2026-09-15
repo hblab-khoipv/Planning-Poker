@@ -1,9 +1,13 @@
 import {
+  type ActionAck,
+  type ClientToServerEvents,
   type ParticipantDto,
+  type RevealedVoteDto,
   SOCKET_ERROR_CODES,
   SOCKET_EVENTS,
   type ServerToClientEvents,
   type SocketHandshakeAuth,
+  VOTE_ERROR_CODES,
 } from '@planning-poker/shared';
 import { io, type Socket } from 'socket.io-client';
 import { apiBaseUrl } from '@/lib/api-client';
@@ -18,7 +22,7 @@ import { apiBaseUrl } from '@/lib/api-client';
  * who has actually joined opens a socket at all.
  */
 
-export type RoomSocket = Socket<ServerToClientEvents, Record<string, never>>;
+export type RoomSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 export interface RoomSocketOptions {
   roomCode: string;
@@ -88,3 +92,83 @@ export function applyParticipantLeft(
 }
 
 export { SOCKET_EVENTS };
+
+/**
+ * Sends one action and resolves with the server's answer (FR-4, FR-5, FR-7).
+ *
+ * Every action is acknowledged rather than fire-and-forget, because each one can be refused for
+ * a reason the person needs to see: a card that is not in this room's deck, a round somebody
+ * else already revealed, or an action only the host may take. A socket that has dropped would
+ * otherwise leave the click looking like it worked.
+ */
+function requestAction(
+  socket: RoomSocket,
+  send: (ack: (result: ActionAck) => void) => void,
+): Promise<ActionAck> {
+  return new Promise((resolve) => {
+    if (!socket.connected) {
+      resolve({
+        ok: false,
+        code: VOTE_ERROR_CODES.INTERNAL,
+        message: 'Mất kết nối tới phòng, đang thử lại…',
+      });
+      return;
+    }
+    send(resolve);
+  });
+}
+
+/** FR-4: choose a card, or change the one already chosen. */
+export function castVote(socket: RoomSocket, value: string): Promise<ActionAck> {
+  return requestAction(socket, (ack) => socket.emit(SOCKET_EVENTS.VOTE_CAST, { value }, ack));
+}
+
+/** FR-5: turn every card over. The server refuses anybody who is not the host. */
+export function revealRound(socket: RoomSocket): Promise<ActionAck> {
+  return requestAction(socket, (ack) => socket.emit(SOCKET_EVENTS.ROUND_REVEAL, ack));
+}
+
+/**
+ * FR-7: start the next round.
+ *
+ * "Vote lại" (same item) and "Round mới" (next item) both call this — PRD §8 has one
+ * `round:reset` event and §7 one "mỗi lần Round mới tạo 1 record", so the two buttons differ
+ * only in the label the user reads. See `apps/api/src/realtime/voting.ts`.
+ */
+export function resetRound(socket: RoomSocket): Promise<ActionAck> {
+  return requestAction(socket, (ack) => socket.emit(SOCKET_EVENTS.ROUND_RESET, ack));
+}
+
+/** What a refused action should say, in words a Vietnamese-speaking user can act on. */
+export function messageForActionError(ack: ActionAck): string | null {
+  if (ack.ok) return null;
+  switch (ack.code) {
+    case VOTE_ERROR_CODES.NOT_HOST:
+      return 'Chỉ host mới lộ bài hoặc mở round mới được.';
+    case VOTE_ERROR_CODES.ROUND_NOT_OPEN:
+      return 'Round này đã lộ bài, hãy chờ host mở round mới.';
+    case VOTE_ERROR_CODES.INVALID_CARD:
+      return 'Thẻ này không thuộc bộ thẻ của phòng.';
+    case VOTE_ERROR_CODES.NO_ROUND:
+      return 'Phòng chưa có round nào.';
+    default:
+      return ack.message;
+  }
+}
+
+/**
+ * Applies one `vote:cast` to the set of people who have voted.
+ *
+ * A Set rather than a list because the event repeats every time somebody changes their mind
+ * (FR-4 allows that until the reveal), and "Lan has voted" is true once however many cards she
+ * tried. Returns the same set unchanged when there is nothing new, so React can skip a render.
+ */
+export function applyVoteCast(voted: ReadonlySet<string>, participantId: string): Set<string> {
+  if (voted.has(participantId)) return voted as Set<string>;
+  return new Set(voted).add(participantId);
+}
+
+/** Card values by participant id — how the results table looks a person's vote up. */
+export function votesByParticipant(votes: readonly RevealedVoteDto[]): Map<string, string> {
+  return new Map(votes.map((vote) => [vote.participantId, vote.value]));
+}

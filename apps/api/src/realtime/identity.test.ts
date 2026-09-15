@@ -20,6 +20,7 @@ const ROOM: Room = {
   name: 'Sprint 42 refinement',
   deckType: 'fibonacci',
   hostId: null,
+  hostParticipantId: null,
   createdAt: new Date('2026-09-15T00:00:00.000Z'),
   lastActiveAt: new Date('2026-09-15T00:00:00.000Z'),
 };

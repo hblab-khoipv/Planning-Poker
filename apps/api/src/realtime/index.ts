@@ -1,4 +1,4 @@
-import { SOCKET_EVENTS } from '@planning-poker/shared';
+import { type RoomStatePayload, SOCKET_EVENTS } from '@planning-poker/shared';
 import type pg from 'pg';
 import type { Socket } from 'socket.io';
 import { config } from '../config.js';
@@ -6,8 +6,10 @@ import {
   listParticipantsWithUsers,
   setParticipantOnline,
 } from '../db/repositories/participants.js';
-import type { Participant, Room } from '../db/repositories/types.js';
-import { toParticipantDto } from '../http/dto.js';
+import { ensureCurrentRound } from '../db/repositories/rounds.js';
+import type { Participant, Queryable, Room } from '../db/repositories/types.js';
+import { findVoteForParticipant, listVotesForRound } from '../db/repositories/votes.js';
+import { toParticipantDto, toRoundStateDto } from '../http/dto.js';
 import {
   emitParticipantJoined,
   emitParticipantLeft,
@@ -16,15 +18,17 @@ import {
 } from './channel.js';
 import { authenticateHandshake, SocketAuthError } from './identity.js';
 import { PresenceTracker, type PresenceTimers } from './presence.js';
+import { registerVotingHandlers } from './voting.js';
 
 /**
  * The realtime half of FR-3: the participant list, pushed instead of polled.
  *
- * This layer carries live state; it does not create any. REST still owns creating a room and
- * taking a seat in it (`src/routes/rooms.ts`), and a socket may only pick up a seat that already
- * exists — see `identity.ts`. The one piece of state it does own is presence: `is_online` is
- * written here on connect and on a disconnect that outlives the grace window, which is what
- * keeps `GET /rooms/:code/participants` agreeing with what the sockets have seen.
+ * This layer carries live state; it does not create any *identity*. REST still owns creating a
+ * room and taking a seat in it (`src/routes/rooms.ts`), and a socket may only pick up a seat that
+ * already exists — see `identity.ts`. Two pieces of state it does own: presence (`is_online` is
+ * written here on connect and on a disconnect that outlives the grace window, which is what keeps
+ * `GET /rooms/:code/participants` agreeing with what the sockets have seen), and the voting
+ * actions of PRD §4 steps 5–8, which `voting.ts` implements.
  */
 
 export interface RealtimeOptions {
@@ -78,6 +82,8 @@ export function attachRealtime(
     const { room, participant } = (socket as RoomSocket).data;
     const channel = roomChannel(room.code);
 
+    registerVotingHandlers(io, pool, socket, { room, participant });
+
     void (async () => {
       await socket.join(channel);
 
@@ -89,7 +95,13 @@ export function attachRealtime(
       const participants = await listParticipantsWithUsers(pool, room.id);
       socket.emit(SOCKET_EVENTS.ROOM_STATE, {
         roomCode: room.code,
-        participants: participants.map((row) => toParticipantDto(row, { hostId: room.hostId })),
+        participants: participants.map((row) =>
+          toParticipantDto(row, {
+            hostId: room.hostId,
+            hostParticipantId: room.hostParticipantId,
+          }),
+        ),
+        ...(await roundSnapshot(pool, room, participant)),
       });
 
       if (announce) {
@@ -100,6 +112,7 @@ export function attachRealtime(
           toParticipantDto(seat ?? participant, {
             userName: seat?.userName ?? null,
             hostId: room.hostId,
+            hostParticipantId: room.hostParticipantId,
           }),
         );
       }
@@ -124,6 +137,27 @@ export function attachRealtime(
   return {
     close: () => presence.dispose(),
   };
+}
+
+/**
+ * The round half of a socket's opening snapshot.
+ *
+ * `toRoundStateDto` is what decides whether any card value is in there — it strips them unless
+ * the round is `revealed`. `myVote` is added on top and is the one field in the whole realtime
+ * layer that names a value before a reveal: it is this socket's own card, on a payload sent with
+ * `socket.emit` to that socket alone, which is what lets somebody who reloaded mid-round see
+ * their own selection restored (PRD §12's reconnect question) without learning anybody else's.
+ */
+async function roundSnapshot(
+  db: Queryable,
+  room: Room,
+  participant: Participant,
+): Promise<Omit<RoomStatePayload, 'roomCode' | 'participants'>> {
+  const round = await ensureCurrentRound(db, room.id);
+  const votes = await listVotesForRound(db, round.id);
+  const mine = await findVoteForParticipant(db, round.id, participant.id);
+
+  return { ...toRoundStateDto(round, votes, room.deckType), myVote: mine?.value ?? null };
 }
 
 export { roomChannel } from './channel.js';

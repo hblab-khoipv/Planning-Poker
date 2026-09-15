@@ -1,4 +1,5 @@
 import type { DeckType } from './decks.js';
+import type { RoundStateDto } from './rounds.js';
 
 /**
  * The wire shapes of the room REST API (PRD FR-1, FR-2, FR-3), shared so the browser and the
@@ -10,7 +11,13 @@ export interface RoomDto {
   code: string;
   name: string;
   deckType: DeckType;
+  /** The host's `users.id`, or null when a guest created the room (PRD §7). */
   hostId: string | null;
+  /**
+   * The host's seat. Set for every room, guest-hosted ones included, which is what gives a
+   * guest-created room a host at all — see `apps/api/src/http/authority.ts`.
+   */
+  hostParticipantId: string | null;
   createdAt: string;
 }
 
@@ -56,6 +63,9 @@ export interface RoomResponse {
 export interface ParticipantsResponse {
   participants: ParticipantDto[];
 }
+
+/** `GET /rooms/:code/round` — the REST read of what the socket pushes as `room:state`. */
+export type RoundStateResponse = RoundStateDto;
 
 /** Every non-2xx response from the room API has this body. */
 export interface ApiErrorResponse {

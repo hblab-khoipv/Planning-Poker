@@ -1,16 +1,19 @@
-import { SOCKET_ERROR_CODES, type ParticipantDto } from '@planning-poker/shared';
+import { type ParticipantDto, SOCKET_ERROR_CODES, VOTE_ERROR_CODES } from '@planning-poker/shared';
 import { describe, expect, it } from 'vitest';
 import {
   applyParticipantJoined,
   applyParticipantLeft,
+  applyVoteCast,
+  messageForActionError,
   messageForSocketError,
+  votesByParticipant,
 } from '@/lib/room-socket';
 
 /**
  * How the browser folds the room's event stream into the list it renders. The rules that matter
  * are both about *not* trusting the stream to be tidy: the same person can be announced twice
- * (snapshot, then a rejoin), and somebody leaving must not be deleted — their seat, and from
- * task 6 their vote, outlives their connection.
+ * (snapshot, then a rejoin), and somebody leaving must not be deleted — their seat, and the vote
+ * it holds, outlives their connection.
  */
 
 function participant(overrides: Partial<ParticipantDto> = {}): ParticipantDto {
@@ -90,5 +93,71 @@ describe('messageForSocketError', () => {
 
   it('falls back to a reconnecting message for a transport failure', () => {
     expect(messageForSocketError(new Error('xhr poll error'))).toContain('kết nối lại');
+  });
+});
+
+/**
+ * The voting half of the room socket (FR-4 → FR-7). These are the pure reducers and the
+ * refusal messages; the wire behaviour they sit on is covered by the API's integration suite
+ * and the e2e run.
+ */
+describe('applyVoteCast', () => {
+  it('records that somebody voted', () => {
+    expect([...applyVoteCast(new Set(), 'p1')]).toEqual(['p1']);
+  });
+
+  it('is idempotent, because changing a vote re-announces it', () => {
+    const voted = new Set(['p1']);
+    // Same set back, so React can skip the render entirely.
+    expect(applyVoteCast(voted, 'p1')).toBe(voted);
+  });
+
+  it('does not mutate the set it was given', () => {
+    const voted = new Set(['p1']);
+    const next = applyVoteCast(voted, 'p2');
+
+    expect([...voted]).toEqual(['p1']);
+    expect([...next]).toEqual(['p1', 'p2']);
+  });
+});
+
+describe('votesByParticipant', () => {
+  it('indexes revealed votes so a row can look its own value up', () => {
+    const index = votesByParticipant([
+      { participantId: 'p1', value: '5' },
+      { participantId: 'p2', value: '8' },
+    ]);
+
+    expect(index.get('p1')).toBe('5');
+    expect(index.get('p2')).toBe('8');
+    expect(index.has('p3')).toBe(false);
+  });
+
+  it('is empty for a round nobody has revealed', () => {
+    expect(votesByParticipant([]).size).toBe(0);
+  });
+});
+
+describe('messageForActionError', () => {
+  it('says nothing when the action succeeded', () => {
+    expect(messageForActionError({ ok: true })).toBeNull();
+  });
+
+  it('explains a refusal in terms of what the person tried to do', () => {
+    expect(
+      messageForActionError({ ok: false, code: VOTE_ERROR_CODES.NOT_HOST, message: 'nope' }),
+    ).toMatch(/Chỉ host/);
+    expect(
+      messageForActionError({ ok: false, code: VOTE_ERROR_CODES.ROUND_NOT_OPEN, message: 'nope' }),
+    ).toMatch(/đã lộ bài/);
+    expect(
+      messageForActionError({ ok: false, code: VOTE_ERROR_CODES.INVALID_CARD, message: 'nope' }),
+    ).toMatch(/không thuộc bộ thẻ/);
+  });
+
+  it("falls back to the server's own message for anything unrecognised", () => {
+    expect(
+      messageForActionError({ ok: false, code: VOTE_ERROR_CODES.INTERNAL, message: 'mất kết nối' }),
+    ).toBe('mất kết nối');
   });
 });
