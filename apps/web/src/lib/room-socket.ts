@@ -118,9 +118,22 @@ function requestAction(
   });
 }
 
-/** FR-4: choose a card, or change the one already chosen. */
+/** FR-4: choose a card, or change the one already chosen, while the round is still open. */
 export function castVote(socket: RoomSocket, value: string): Promise<ActionAck> {
   return requestAction(socket, (ack) => socket.emit(SOCKET_EVENTS.VOTE_CAST, { value }, ack));
+}
+
+/**
+ * Issue #11: change one's own card on a round the room has already seen.
+ *
+ * A separate event from `castVote` rather than the same one aimed at a revealed round, because
+ * the two mean different things to everybody else in the room: an ordinary vote is private until
+ * the reveal, while this one is a public correction that the server records as such. The request
+ * carries a card and no identity — whose card moves is settled by the socket's own handshake, so
+ * a browser cannot edit somebody else's even by lying.
+ */
+export function editVote(socket: RoomSocket, value: string): Promise<ActionAck> {
+  return requestAction(socket, (ack) => socket.emit(SOCKET_EVENTS.VOTE_EDIT, { value }, ack));
 }
 
 /** FR-5: turn every card over. The server refuses anybody who is not the host. */
@@ -147,6 +160,10 @@ export function messageForActionError(ack: ActionAck): string | null {
       return 'Chỉ host mới lộ bài hoặc mở round mới được.';
     case VOTE_ERROR_CODES.ROUND_NOT_OPEN:
       return 'Round này đã lộ bài, hãy chờ host mở round mới.';
+    case VOTE_ERROR_CODES.ROUND_NOT_REVEALED:
+      return 'Round chưa lộ bài — hãy chọn thẻ như bình thường.';
+    case VOTE_ERROR_CODES.NO_VOTE:
+      return 'Bạn chưa vote ở round này nên không có bài để sửa.';
     case VOTE_ERROR_CODES.INVALID_CARD:
       return 'Thẻ này không thuộc bộ thẻ của phòng.';
     case VOTE_ERROR_CODES.NO_ROUND:
@@ -168,7 +185,15 @@ export function applyVoteCast(voted: ReadonlySet<string>, participantId: string)
   return new Set(voted).add(participantId);
 }
 
-/** Card values by participant id — how the results table looks a person's vote up. */
-export function votesByParticipant(votes: readonly RevealedVoteDto[]): Map<string, string> {
-  return new Map(votes.map((vote) => [vote.participantId, vote.value]));
+/**
+ * Revealed votes by participant id — how the table and the results look a person's card up.
+ *
+ * The whole vote is kept, not just its value, because since issue #11 a card carries the one it
+ * replaced: dropping to a plain string here would throw away the evidence of an edit before any
+ * screen could show it.
+ */
+export function votesByParticipant(
+  votes: readonly RevealedVoteDto[],
+): Map<string, RevealedVoteDto> {
+  return new Map(votes.map((vote) => [vote.participantId, vote]));
 }

@@ -18,8 +18,8 @@ function entry(overrides: Partial<RoundHistoryEntryDto> = {}): RoundHistoryEntry
     },
     votedParticipantIds: ['seat-1', 'seat-2'],
     votes: [
-      { participantId: 'seat-1', value: '3' },
-      { participantId: 'seat-2', value: '5' },
+      { participantId: 'seat-1', value: '3', originalValue: null, editedAt: null },
+      { participantId: 'seat-2', value: '5', originalValue: null, editedAt: null },
     ],
     tally: { voteCount: 2, numericCount: 2, average: 4, median: 4, consensus: false },
     ...overrides,
@@ -79,10 +79,28 @@ describe('hasResults', () => {
 
 describe('votesByParticipantId', () => {
   it('keys the cards by who played them', () => {
-    expect([...votesByParticipantId(entry()).entries()]).toEqual([
-      ['seat-1', '3'],
-      ['seat-2', '5'],
-    ]);
+    const index = votesByParticipantId(entry());
+
+    expect([...index.keys()]).toEqual(['seat-1', 'seat-2']);
+    expect(index.get('seat-1')?.value).toBe('3');
+    expect(index.get('seat-2')?.value).toBe('5');
+  });
+
+  it('still carries an old edit long after the meeting (issue #11)', () => {
+    const index = votesByParticipantId(
+      entry({
+        votes: [
+          {
+            participantId: 'seat-1',
+            value: '3',
+            originalValue: '8',
+            editedAt: '2026-09-01T09:12:00.000Z',
+          },
+        ],
+      }),
+    );
+
+    expect(index.get('seat-1')).toMatchObject({ value: '3', originalValue: '8' });
   });
 
   it('is empty for a round whose values were withheld', () => {

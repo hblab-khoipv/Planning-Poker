@@ -6,6 +6,7 @@ import {
   SOCKET_EVENTS,
   type ServerToClientEvents,
   type VoteCastPayload,
+  type VoteEditedPayload,
 } from '@planning-poker/shared';
 import type { Server } from 'socket.io';
 
@@ -15,9 +16,9 @@ import type { Server } from 'socket.io';
  * Every broadcast goes through one of these functions, so "what can this server possibly send to
  * a room?" is answered by reading this file. That matters for FR-4: `emitVoteCast` takes a
  * participant id and nothing else, so there is no way to put a vote value on the wire while a
- * round is still being voted on. Exactly one emitter carries card values — `emitRoundRevealed` —
- * and its payload can only be built by `toRoundStateDto` from a round the database already
- * records as `revealed` (see `voting.ts`).
+ * round is still being voted on. Two emitters carry card values — `emitRoundRevealed` and
+ * `emitVoteEdited` — and both of their payloads can only be built by `toRoundStateDto` from a
+ * round the database already records as `revealed` (see `voting.ts`).
  */
 
 export type RealtimeServer = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -75,6 +76,23 @@ export function emitRoundRevealed(
   payload: RoundRevealedPayload,
 ): void {
   io.to(roomChannel(roomCode)).emit(SOCKET_EVENTS.ROUND_REVEALED, payload);
+}
+
+/**
+ * Issue #11's edit-after-reveal — the second broadcast that carries card values.
+ *
+ * Like `emitRoundRevealed` it takes a finished payload rather than the pieces to build one, for
+ * the same reason: assembling it is the step that has to check the round's status, and
+ * `voting.ts` does that by building it with `toRoundStateDto` from a round Postgres already
+ * records as `revealed`. An open round cannot produce a payload with values in it, so the
+ * pre-reveal secrecy of FR-4 survives the new event unchanged.
+ */
+export function emitVoteEdited(
+  io: RealtimeServer,
+  roomCode: string,
+  payload: VoteEditedPayload,
+): void {
+  io.to(roomChannel(roomCode)).emit(SOCKET_EVENTS.VOTE_EDITED, payload);
 }
 
 /** PRD §8 `round:reset` — a new round is open, so every client clears its local vote state. */

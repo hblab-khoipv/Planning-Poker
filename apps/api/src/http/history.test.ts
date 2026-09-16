@@ -33,13 +33,15 @@ function round(overrides: Partial<VotingRound> = {}): VotingRound {
   };
 }
 
-function vote(participantId: string, value: string): Vote {
+function vote(participantId: string, value: string, edit?: { from: string; at: Date }): Vote {
   return {
     id: `vote-${participantId}`,
     roundId: 'round-1',
     participantId,
     value,
     votedAt: new Date('2026-09-01T09:07:00.000Z'),
+    originalValue: edit?.from ?? null,
+    editedAt: edit?.at ?? null,
   };
 }
 
@@ -96,10 +98,28 @@ describe('toRoundHistoryEntryDto', () => {
     expect(dto.round.roundNumber).toBe(1);
     expect(dto.round.revealedAt).toBe('2026-09-01T09:10:00.000Z');
     expect(dto.votes).toEqual([
-      { participantId: 'seat-1', value: '3' },
-      { participantId: 'seat-2', value: '5' },
+      { participantId: 'seat-1', value: '3', originalValue: null, editedAt: null },
+      { participantId: 'seat-2', value: '5', originalValue: null, editedAt: null },
     ]);
     expect(dto.tally).toMatchObject({ voteCount: 2, average: 4, median: 4, consensus: false });
+  });
+
+  it('still says which card was edited long after the meeting (issue #11)', () => {
+    const entry: RoundWithVotes = {
+      round: round(),
+      votes: [
+        vote('seat-1', '3', { from: '8', at: new Date('2026-09-01T09:12:00.000Z') }),
+        vote('seat-2', '5'),
+      ],
+    };
+
+    const dto = toRoundHistoryEntryDto(entry, 'fibonacci');
+
+    expect(dto.votes[0]).toMatchObject({
+      value: '3',
+      originalValue: '8',
+      editedAt: '2026-09-01T09:12:00.000Z',
+    });
   });
 
   /**

@@ -1,4 +1,4 @@
-import type { RoundHistoryEntryDto } from '@planning-poker/shared';
+import type { RevealedVoteDto, RoundHistoryEntryDto } from '@planning-poker/shared';
 
 /**
  * Presentation rules for the history screens (PRD §9.6), kept out of the components so they can
@@ -45,7 +45,13 @@ export function hasResults(
   return entry.tally !== null;
 }
 
-/** Card values keyed by the participant who played them, for a revealed round. */
-export function votesByParticipantId(entry: RoundHistoryEntryDto): Map<string, string> {
-  return new Map(entry.votes.map((vote) => [vote.participantId, vote.value]));
+/**
+ * Cards keyed by the participant who played them, for a revealed round.
+ *
+ * The whole vote rather than its value, for the same reason as the live room's
+ * `votesByParticipant`: since issue #11 a card may carry the one it replaced, and a past meeting
+ * is exactly where "she changed her estimate after we all showed" is worth still being able to see.
+ */
+export function votesByParticipantId(entry: RoundHistoryEntryDto): Map<string, RevealedVoteDto> {
+  return new Map(entry.votes.map((vote) => [vote.participantId, vote]));
 }

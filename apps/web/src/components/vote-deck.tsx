@@ -17,6 +17,7 @@ export function VoteDeck({
   deckType,
   selected,
   disabled = false,
+  editing = false,
   onSelect,
 }: {
   deckType: DeckType;
@@ -24,12 +25,18 @@ export function VoteDeck({
   selected: string | null;
   /** True once the round is revealed — the cards are on the table, nothing left to choose. */
   disabled?: boolean;
+  /**
+   * The round is revealed and this browser has asked to correct its own card (issue #11).
+   * Only the label changes: picking a card here is a public edit, and saying so before the click
+   * is what keeps it from feeling like an ordinary, private vote.
+   */
+  editing?: boolean;
   onSelect: (value: string) => void;
 }) {
   return (
     <section aria-labelledby="deck-heading" className="space-y-3">
       <h2 id="deck-heading" className="text-xl font-semibold">
-        Chọn thẻ của bạn
+        {editing ? 'Chọn thẻ mới — cả phòng sẽ thấy bạn đã sửa' : 'Chọn thẻ của bạn'}
       </h2>
 
       <ul data-testid="vote-deck" className="flex flex-wrap gap-2">
@@ -49,7 +56,7 @@ export function VoteDeck({
                   isSelected
                     ? 'border-indigo-400 bg-indigo-500/20 text-indigo-200 ring-2 ring-indigo-400'
                     : 'border-slate-700 bg-slate-900 text-slate-100 hover:border-indigo-500'
-                } disabled:cursor-not-allowed disabled:opacity-40`}
+                } ${editing ? 'ring-1 ring-amber-400/60' : ''} disabled:cursor-not-allowed disabled:opacity-40`}
               >
                 {value}
               </button>
@@ -60,7 +67,14 @@ export function VoteDeck({
 
       {disabled ? (
         <p className="text-sm text-slate-400" data-testid="deck-locked">
-          Round đã lộ bài. Chờ host mở round mới để vote tiếp.
+          Round đã lộ bài. Bấm “Sửa bài” trên lá bài của bạn nếu muốn đổi, hoặc chờ host mở round
+          mới.
+        </p>
+      ) : null}
+
+      {editing ? (
+        <p className="text-sm text-amber-300" data-testid="deck-editing">
+          Bạn đang sửa lá bài đã lộ — thẻ mới sẽ được đánh dấu “đã sửa” cho cả phòng thấy.
         </p>
       ) : null}
     </section>

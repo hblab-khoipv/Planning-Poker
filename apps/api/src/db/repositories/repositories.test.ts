@@ -7,7 +7,7 @@ import {
   findRoomByCode,
   ROOM_NAME_MAX_LENGTH,
 } from './rooms.js';
-import { assertValidVoteValue, castVote } from './votes.js';
+import { assertValidVoteValue, castVote, editRevealedVote } from './votes.js';
 import { ConflictError, isUniqueViolation, type Queryable, ValidationError } from './types.js';
 
 /**
@@ -289,15 +289,17 @@ describe('assertValidVoteValue', () => {
   });
 });
 
-describe('castVote', () => {
-  const VOTE_ROW = {
-    id: 'vote-1',
-    round_id: 'round-1',
-    participant_id: 'participant-1',
-    value: '8',
-    voted_at: new Date('2026-09-14T00:00:00Z'),
-  };
+const VOTE_ROW = {
+  id: 'vote-1',
+  round_id: 'round-1',
+  participant_id: 'participant-1',
+  value: '8',
+  voted_at: new Date('2026-09-14T00:00:00Z'),
+  original_value: null,
+  edited_at: null,
+};
 
+describe('castVote', () => {
   it('upserts onto the one-vote-per-participant key', async () => {
     const db = new FakeDb([{ rows: [VOTE_ROW] }]);
 
@@ -319,6 +321,94 @@ describe('castVote', () => {
 
     await expect(
       castVote(db, {
+        roundId: 'round-1',
+        participantId: 'participant-1',
+        deckType: 'fibonacci',
+        value: 'XL',
+      }),
+    ).rejects.toThrow(ValidationError);
+    expect(db.calls).toHaveLength(0);
+  });
+
+  it('reads a row that predates the edit columns as never edited', async () => {
+    const db = new FakeDb([{ rows: [{ ...VOTE_ROW, original_value: null, edited_at: null }] }]);
+
+    const vote = await castVote(db, {
+      roundId: 'round-1',
+      participantId: 'participant-1',
+      deckType: 'fibonacci',
+      value: '8',
+    });
+
+    expect(vote.originalValue).toBeNull();
+    expect(vote.editedAt).toBeNull();
+  });
+});
+
+describe('editRevealedVote', () => {
+  it('keeps the card the room first saw and stamps when it changed', async () => {
+    const db = new FakeDb([
+      {
+        rows: [
+          {
+            ...VOTE_ROW,
+            value: '3',
+            original_value: '8',
+            edited_at: new Date('2026-09-14T00:05:00Z'),
+          },
+        ],
+      },
+    ]);
+
+    const vote = await editRevealedVote(db, {
+      roundId: 'round-1',
+      participantId: 'participant-1',
+      deckType: 'fibonacci',
+      value: '3',
+    });
+
+    // COALESCE, not an overwrite: a second edit still points at the reveal-time card.
+    expect(db.lastCall.text).toContain('original_value = COALESCE(original_value, value)');
+    expect(db.lastCall.text).toContain('edited_at = now()');
+    expect(db.lastCall.values).toEqual(['round-1', 'participant-1', '3']);
+    expect(vote?.value).toBe('3');
+    expect(vote?.originalValue).toBe('8');
+    expect(vote?.editedAt).toEqual(new Date('2026-09-14T00:05:00Z'));
+  });
+
+  it('scopes the update to a single seat, so one call cannot move two cards', async () => {
+    const db = new FakeDb([{ rows: [{ ...VOTE_ROW, value: '3', original_value: '8' }] }]);
+
+    await editRevealedVote(db, {
+      roundId: 'round-1',
+      participantId: 'participant-1',
+      deckType: 'fibonacci',
+      value: '3',
+    });
+
+    expect(db.lastCall.text).toContain('WHERE round_id = $1 AND participant_id = $2');
+  });
+
+  it('reports nothing changed when the card is the one already shown', async () => {
+    const db = new FakeDb([{ rows: [] }]);
+
+    const vote = await editRevealedVote(db, {
+      roundId: 'round-1',
+      participantId: 'participant-1',
+      deckType: 'fibonacci',
+      value: '8',
+    });
+
+    // The `value <> $3` guard matched nothing, so nobody is badged as having edited anything.
+    expect(db.lastCall.text).toContain('value <> $3');
+    expect(vote).toBeNull();
+  });
+
+  it('validates against the deck before issuing any SQL', async () => {
+    const db = new FakeDb([]);
+
+    await expect(
+      editRevealedVote(db, {
         roundId: 'round-1',
         participantId: 'participant-1',
         deckType: 'fibonacci',

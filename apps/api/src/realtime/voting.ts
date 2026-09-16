@@ -11,10 +11,12 @@ import type { Socket } from 'socket.io';
 import {
   castVote,
   createRound,
+  editRevealedVote,
   ensureCurrentRound,
   findCurrentRound,
   findRoomById,
   findRoundById,
+  findVoteForParticipant,
   listVotesForRound,
   lockRoundForUpdate,
   type Participant,
@@ -28,7 +30,13 @@ import {
 import { withTransaction } from '../db/transaction.js';
 import { isRoomHost } from '../http/authority.js';
 import { toRoundDto, toRoundStateDto } from '../http/dto.js';
-import { emitRoundReset, emitRoundRevealed, emitVoteCast, type RealtimeServer } from './channel.js';
+import {
+  emitRoundReset,
+  emitRoundRevealed,
+  emitVoteCast,
+  emitVoteEdited,
+  type RealtimeServer,
+} from './channel.js';
 
 /**
  * Voting, revealing and starting a new round (PRD §4 steps 5–8, FR-4 → FR-7).
@@ -36,13 +44,18 @@ import { emitRoundReset, emitRoundRevealed, emitVoteCast, type RealtimeServer } 
  * Three things shape this module:
  *
  * 1. **A vote's value leaves the server exactly once.** The cast handler answers the room with
- *    `vote:cast`, which by construction carries only a participant id (`channel.ts`), and the
- *    only broadcast with card values in it is built by `toRoundStateDto` from a round Postgres
- *    has already flipped to `revealed`. There is no ordering of these calls that reveals early.
+ *    `vote:cast`, which by construction carries only a participant id (`channel.ts`), and every
+ *    broadcast with card values in it is built by `toRoundStateDto` from a round Postgres has
+ *    already flipped to `revealed`. There is no ordering of these calls that reveals early.
  * 2. **Authority is re-read, never remembered.** The room resolved at handshake is a snapshot;
  *    reveal and reset load the room again so the decision is made against the current row.
  * 3. **Refusals are private.** A non-host who clicks "Lộ bài" gets an acknowledgement, not an
  *    event — the room never learns somebody tried, and the socket stays up.
+ *
+ * Issue #11 adds a fourth action, `vote:edit`: changing one's own card after the room has seen
+ * it. Its ownership rule is not a check but the absence of a parameter — the payload names a
+ * card and nothing else, and the participant comes from the handshake, exactly as it does for
+ * `vote:cast`. There is no request a client can send that moves somebody else's card.
  */
 
 /** A refusal, in the shape the client's acknowledgement callback expects. */
@@ -112,6 +125,29 @@ export async function requireOpenRound(db: Queryable, roomId: string): Promise<V
 }
 
 /**
+ * The round an edit may be aimed at: the room's current one, and only once it is revealed
+ * (issue #11).
+ *
+ * The mirror image of `requireOpenRound`, and locked for the same reason: inside
+ * `withTransaction` the `FOR UPDATE` read makes a concurrent reveal or reset resolve before the
+ * edit decides anything, so an edit cannot land on a round whose status changed underneath it.
+ * A round still being voted on is refused rather than quietly treated as a plain vote — a client
+ * that sent the wrong event needs to hear so, and stamping edit evidence on a card nobody has
+ * seen would invent a change the room never witnessed.
+ */
+export async function requireRevealedRound(db: Queryable, roomId: string): Promise<VotingRound> {
+  const round = await ensureCurrentRound(db, roomId);
+  const locked = await lockRoundForUpdate(db, round.id);
+  if (!locked || locked.status !== 'revealed') {
+    throw new VoteActionError(
+      VOTE_ERROR_CODES.ROUND_NOT_REVEALED,
+      'round chưa lộ bài, hãy chọn thẻ như bình thường',
+    );
+  }
+  return locked;
+}
+
+/**
  * Re-reads the room and refuses anybody who is not its host (FR-5, FR-7).
  *
  * The room is loaded again rather than taken from the handshake snapshot: `host_participant_id`
@@ -167,6 +203,67 @@ export async function handleVoteCast(
   await touchRoom(pool, context.room.id);
 
   emitVoteCast(io, context.room.code, context.participant.id);
+}
+
+/**
+ * Changes one's own card after the reveal, leaving evidence that it changed (issue #11).
+ *
+ * Three properties, in the order they matter:
+ *
+ * 1. **Only your own card moves.** `context.participant` comes from the handshake and the payload
+ *    carries no id, so there is nothing here to forge — the same construction that keeps
+ *    `vote:cast` honest. A seat that never voted has nothing to edit and is refused.
+ * 2. **The change is visible.** `editRevealedVote` writes the old card and a timestamp beside the
+ *    new one, and the broadcast is rebuilt from those rows, so every screen in the room learns
+ *    what the card was as well as what it is now.
+ * 3. **The numbers follow the cards.** The tally is recomputed from the round's votes as they now
+ *    stand, in the same transaction that changed one of them, so no client can end up holding an
+ *    average that belongs to a set of cards it is no longer showing.
+ *
+ * Re-picking the card you already show is a no-op rather than an edit: `editRevealedVote` returns
+ * null, and the room is told nothing.
+ */
+export async function handleVoteEdit(
+  pool: pg.Pool,
+  io: RealtimeServer,
+  context: { room: Room; participant: Participant },
+  payload: unknown,
+): Promise<void> {
+  const value = readVoteRequest(payload);
+
+  const changed = await withTransaction(pool, async (client) => {
+    const round = await requireRevealedRound(client, context.room.id);
+
+    const mine = await findVoteForParticipant(client, round.id, context.participant.id);
+    if (!mine) {
+      throw new VoteActionError(
+        VOTE_ERROR_CODES.NO_VOTE,
+        'bạn chưa vote ở round này nên không có bài để sửa',
+      );
+    }
+
+    const edited = await editRevealedVote(client, {
+      roundId: round.id,
+      participantId: context.participant.id,
+      deckType: context.room.deckType,
+      value,
+    });
+    if (!edited) return null;
+
+    return { round, votes: await listVotesForRound(client, round.id) };
+  });
+
+  if (!changed) return;
+
+  await touchRoom(pool, context.room.id);
+
+  const state = toRoundStateDto(changed.round, changed.votes, context.room.deckType);
+  emitVoteEdited(io, context.room.code, {
+    participantId: context.participant.id,
+    round: state.round as NonNullable<typeof state.round>,
+    votes: state.votes,
+    tally: state.tally as NonNullable<typeof state.tally>,
+  });
 }
 
 /**
@@ -232,7 +329,7 @@ export async function handleRoundReset(
   emitRoundReset(io, room.code, { round: toRoundDto(round) });
 }
 
-/** Wires the three client→server actions onto one connected socket. */
+/** Wires the four client→server actions onto one connected socket. */
 export function registerVotingHandlers(
   io: RealtimeServer,
   pool: pg.Pool,
@@ -254,6 +351,10 @@ export function registerVotingHandlers(
 
   socket.on(SOCKET_EVENTS.VOTE_CAST, (payload: unknown, ack?: AckFn) => {
     run(() => handleVoteCast(pool, io, context, payload), ack);
+  });
+
+  socket.on(SOCKET_EVENTS.VOTE_EDIT, (payload: unknown, ack?: AckFn) => {
+    run(() => handleVoteEdit(pool, io, context, payload), ack);
   });
 
   socket.on(SOCKET_EVENTS.ROUND_REVEAL, (ack?: AckFn) => {

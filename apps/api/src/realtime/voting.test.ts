@@ -6,9 +6,11 @@ import { ValidationError } from '../db/repositories/index.js';
 import {
   ackFor,
   ackOk,
+  handleVoteEdit,
   readVoteRequest,
   requireHost,
   requireOpenRound,
+  requireRevealedRound,
   VoteActionError,
 } from './voting.js';
 
@@ -64,6 +66,19 @@ function roundRow(status: 'voting' | 'revealed') {
   };
 }
 
+function voteRow(participantId: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id: '55555555-5555-4555-8555-555555555555',
+    round_id: roundRow('revealed').id,
+    participant_id: participantId,
+    value: '8',
+    voted_at: new Date('2026-09-15T00:00:30.000Z'),
+    original_value: null,
+    edited_at: null,
+    ...overrides,
+  };
+}
+
 function seat(id: string, userId: string | null = null): Participant {
   return {
     id,
@@ -107,6 +122,161 @@ describe('requireOpenRound', () => {
 
     await expect(requireOpenRound(db, ROOM_ID)).rejects.toMatchObject({
       code: VOTE_ERROR_CODES.ROUND_NOT_OPEN,
+    });
+  });
+});
+
+describe('requireRevealedRound', () => {
+  it('returns the round once the cards are up (issue #11: that is when an edit is allowed)', async () => {
+    const db = new FakeDb([{ rows: [roundRow('revealed')] }, { rows: [roundRow('revealed')] }]);
+
+    await expect(requireRevealedRound(db, ROOM_ID)).resolves.toMatchObject({ status: 'revealed' });
+  });
+
+  it('refuses an edit while the round is still being voted on', async () => {
+    // Changing a card nobody has seen is a plain vote; stamping it as an edit would invent a
+    // change the room never witnessed.
+    const db = new FakeDb([{ rows: [roundRow('voting')] }, { rows: [roundRow('voting')] }]);
+
+    await expect(requireRevealedRound(db, ROOM_ID)).rejects.toMatchObject({
+      code: VOTE_ERROR_CODES.ROUND_NOT_REVEALED,
+    });
+  });
+});
+
+describe('handleVoteEdit', () => {
+  /** A pool whose one client replays canned results and records every statement it is given. */
+  function fakePool(responses: Array<{ rows: unknown[] }>) {
+    const calls: Array<{ text: string; values: unknown[] }> = [];
+    const client = {
+      query(text: string, values: unknown[] = []) {
+        calls.push({ text, values });
+        // BEGIN/COMMIT and the repositories share the queue; only the reads consume a response.
+        if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(text.trim())) {
+          return Promise.resolve({ rows: [], rowCount: 0 });
+        }
+        const next = responses.shift() ?? { rows: [] };
+        return Promise.resolve({ rows: next.rows, rowCount: next.rows.length });
+      },
+      release() {},
+    };
+
+    const pool = {
+      connect: () => Promise.resolve(client),
+      query: (text: string, values: unknown[] = []) => client.query(text, values),
+    } as unknown as pg.Pool;
+
+    return { pool, calls };
+  }
+
+  const emitted: Array<{ event: string; payload: unknown }> = [];
+  const io = {
+    to: () => ({
+      emit: (event: string, payload: unknown) => {
+        emitted.push({ event, payload });
+      },
+    }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any;
+
+  function context(participantId: string) {
+    return {
+      room: {
+        id: ROOM_ID,
+        code: 'AB12CD34',
+        name: 'Sprint 42',
+        deckType: 'fibonacci' as const,
+        hostId: null,
+        hostParticipantId: HOST_SEAT,
+        createdAt: new Date('2026-09-15T00:00:00.000Z'),
+        lastActiveAt: new Date('2026-09-15T00:00:00.000Z'),
+      },
+      participant: seat(participantId),
+    };
+  }
+
+  it('moves only the card of the seat behind the socket, whatever the payload says', async () => {
+    emitted.length = 0;
+    const { pool, calls } = fakePool([
+      { rows: [roundRow('revealed')] }, // ensureCurrentRound
+      { rows: [roundRow('revealed')] }, // FOR UPDATE lock
+      { rows: [voteRow(GUEST_SEAT)] }, // the caller's own vote
+      { rows: [voteRow(GUEST_SEAT, { value: '3', original_value: '8' })] }, // the UPDATE
+      { rows: [voteRow(GUEST_SEAT, { value: '3', original_value: '8' })] }, // listVotesForRound
+      { rows: [] }, // touchRoom
+    ]);
+
+    // A client trying to name somebody else's seat: the extra field has nowhere to go.
+    await handleVoteEdit(pool, io, context(GUEST_SEAT), {
+      value: '3',
+      participantId: HOST_SEAT,
+    });
+
+    const update = calls.find((call) => call.text.includes('UPDATE votes'));
+    expect(update?.values).toEqual([roundRow('revealed').id, GUEST_SEAT, '3']);
+    expect(update?.values).not.toContain(HOST_SEAT);
+  });
+
+  it('refuses a seat that has no card in this round', async () => {
+    const { pool } = fakePool([
+      { rows: [roundRow('revealed')] },
+      { rows: [roundRow('revealed')] },
+      { rows: [] }, // findVoteForParticipant: nothing to edit
+    ]);
+
+    await expect(
+      handleVoteEdit(pool, io, context(GUEST_SEAT), { value: '3' }),
+    ).rejects.toMatchObject({ code: VOTE_ERROR_CODES.NO_VOTE });
+  });
+
+  it('tells the room nothing when the card picked is the one already shown', async () => {
+    emitted.length = 0;
+    const { pool } = fakePool([
+      { rows: [roundRow('revealed')] },
+      { rows: [roundRow('revealed')] },
+      { rows: [voteRow(GUEST_SEAT)] },
+      { rows: [] }, // the UPDATE matched nothing: value <> $3 was false
+    ]);
+
+    await handleVoteEdit(pool, io, context(GUEST_SEAT), { value: '8' });
+
+    expect(emitted).toHaveLength(0);
+  });
+
+  it('broadcasts the new card together with the one it replaced', async () => {
+    emitted.length = 0;
+    const edited = voteRow(GUEST_SEAT, {
+      value: '3',
+      original_value: '8',
+      edited_at: new Date('2026-09-15T00:02:00.000Z'),
+    });
+    const { pool } = fakePool([
+      { rows: [roundRow('revealed')] },
+      { rows: [roundRow('revealed')] },
+      { rows: [voteRow(GUEST_SEAT)] },
+      { rows: [edited] },
+      { rows: [edited] },
+      { rows: [] },
+    ]);
+
+    await handleVoteEdit(pool, io, context(GUEST_SEAT), { value: '3' });
+
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]).toMatchObject({
+      event: 'vote:edited',
+      payload: {
+        participantId: GUEST_SEAT,
+        votes: [
+          {
+            participantId: GUEST_SEAT,
+            value: '3',
+            originalValue: '8',
+            editedAt: '2026-09-15T00:02:00.000Z',
+          },
+        ],
+        // The numbers are recomputed from the cards as they now stand, not from the reveal.
+        tally: { voteCount: 1, average: 3, median: 3 },
+      },
     });
   });
 });
