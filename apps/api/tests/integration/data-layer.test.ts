@@ -9,7 +9,7 @@ import {
   createRoom,
   createRound,
   createUser,
-  deleteRoomsIdleSince,
+  deleteRoomsIdleBefore,
   deleteVote,
   ensureCurrentRound,
   findCurrentRound,
@@ -198,7 +198,9 @@ describe('data layer against Postgres', () => {
         [stale.id],
       );
 
-      await expect(deleteRoomsIdleSince(db, 24)).resolves.toBe(1);
+      await expect(
+        deleteRoomsIdleBefore(db, new Date(Date.now() - 24 * 60 * 60 * 1000)),
+      ).resolves.toHaveLength(1);
       await expect(findRoomById(db, stale.id)).resolves.toBeNull();
       await expect(findRoomById(db, fresh.id)).resolves.not.toBeNull();
     });

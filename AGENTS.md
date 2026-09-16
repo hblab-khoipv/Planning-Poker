@@ -100,6 +100,14 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   no cookie and every authenticated read silently 401s. `apiBaseUrl()` derives the host from
   `window.location` when `NEXT_PUBLIC_API_URL` is unset; do not replace that with a constant.
   For the same reason `playwright.config.ts` hands both e2e servers one `NEXTAUTH_SECRET`.
+- The idle-room sweep (PRD §3.1.9/FR-10) is `apps/api/src/jobs/room-cleanup.ts`, started from
+  `server.ts` as an in-process interval because the deploy target is one box — no cron entry to
+  keep in sync. It deletes from `rooms` only; participants/rounds/votes go by 0002's cascades and
+  `users`/`accounts`/`sessions` are permanent (PRD §7), so never widen that DELETE. The threshold
+  lives in JS (`staleCutoff`), not in the SQL, which is what makes it unit testable and lets the
+  log name the exact cutoff it deleted by. Activity = write paths only (create/join/socket
+  connect/vote/reveal/reset, all via `touchRoom`); reads never bump `last_active_at`, so polling
+  cannot keep a dead room alive. README has the table and the env vars.
 - Integration tests get fixtures from `apps/api/tests/helpers/seed.ts` (`seedRoomWithRound`,
   `truncateAll`); they build rows through the real repositories, so use them rather than raw INSERTs.
 

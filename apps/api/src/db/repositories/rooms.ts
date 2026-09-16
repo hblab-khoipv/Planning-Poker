@@ -149,14 +149,39 @@ export async function touchRoom(db: Queryable, roomId: string): Promise<Room | n
   return row ? mapRoom(row) : null;
 }
 
-/** Deletes rooms idle for longer than `idleHours`; participants/rounds/votes cascade away. */
-export async function deleteRoomsIdleSince(db: Queryable, idleHours: number): Promise<number> {
-  if (!Number.isFinite(idleHours) || idleHours <= 0) {
-    throw new ValidationError('idleHours must be a positive number');
+/** What a swept room leaves behind in the log (see jobs/room-cleanup.ts). */
+export interface DeletedRoomSummary {
+  id: string;
+  code: string;
+  lastActiveAt: Date;
+}
+
+/**
+ * Deletes every room whose last activity predates `cutoff` (PRD §3.1.9 / FR-10).
+ *
+ * The cutoff arrives as an absolute instant rather than a window in hours, so the caller that
+ * decides what "stale" means is the same one that logs it — see `staleCutoff` in
+ * `jobs/room-cleanup.ts`, where that rule is unit tested without a database.
+ *
+ * Only `rooms` is named here. `room_participants`, `voting_rounds` and `votes` all reference it
+ * with ON DELETE CASCADE (migration 0002), so the room's whole subtree goes with it, while
+ * `users`/`accounts`/`sessions` — permanent per PRD §7 — are untouched: the only foreign keys
+ * pointing from a room at a user are ON DELETE SET NULL in the other direction.
+ *
+ * The RETURNING clause is what makes the sweep observable: the job logs the rooms by code
+ * rather than only counting them.
+ */
+export async function deleteRoomsIdleBefore(
+  db: Queryable,
+  cutoff: Date,
+): Promise<DeletedRoomSummary[]> {
+  if (Number.isNaN(cutoff.getTime())) {
+    throw new ValidationError('cutoff must be a valid date');
   }
-  const { rowCount } = await db.query(
-    `DELETE FROM rooms WHERE last_active_at < now() - ($1 || ' hours')::interval`,
-    [String(idleHours)],
+  const { rows } = await db.query<Pick<RoomRow, 'id' | 'code' | 'last_active_at'>>(
+    `DELETE FROM rooms WHERE last_active_at < $1
+     RETURNING id, code, last_active_at`,
+    [cutoff],
   );
-  return rowCount ?? 0;
+  return rows.map((row) => ({ id: row.id, code: row.code, lastActiveAt: row.last_active_at }));
 }

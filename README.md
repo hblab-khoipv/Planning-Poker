@@ -180,6 +180,34 @@ a reload or a brief drop is not a departure (PRD §12) and `GET /rooms/:code/par
 agreeing with what the sockets have seen. A seat is greyed out, never removed — it still holds a
 vote.
 
+## Idle-room cleanup
+
+PRD §3.1.9 / FR-10: a room nobody has touched for 24 hours is deleted, and its participants,
+rounds and votes go with it through the `ON DELETE CASCADE` foreign keys of migration 0002.
+`users`, `accounts` and `sessions` are permanent (PRD §7) and are never touched — the sweep names
+only `rooms`.
+
+The sweep (`apps/api/src/jobs/room-cleanup.ts`) runs **in-process on an interval**, started from
+`server.ts`, rather than as a cron or systemd timer: the deployment target is a single box running
+this same Node process, so an in-process job means one unit to deploy and one place to configure.
+Staleness is read from `rooms.last_active_at`, never from a cursor this process keeps, so a
+restart simply catches up on the next tick. Every run logs a line — the cutoff it used, how long
+it took, and the codes of the rooms it deleted — because a silent deletion job is indistinguishable
+from a dead one.
+
+What bumps `last_active_at`, i.e. what counts as activity:
+
+| Event                                       | Where                                |
+| ------------------------------------------- | ------------------------------------ |
+| Creating the room                           | `POST /rooms` (the column's default) |
+| Joining it                                  | `POST /rooms/:code/join`             |
+| A seat coming online over Socket.io         | `realtime/index.ts`                  |
+| Casting a vote, revealing, starting a round | `realtime/voting.ts`                 |
+
+Reads deliberately do not count: `GET /rooms/:code` and the participant list leave the clock
+alone, so a polling script or a forgotten dashboard cannot keep an abandoned room alive forever.
+Tune the window with `ROOM_IDLE_HOURS` / `ROOM_CLEANUP_INTERVAL_MS` (see below).
+
 ## Database
 
 `docker compose up -d` brings up PostgreSQL 16 on port `5432` (override with `POSTGRES_PORT`) with database/user/password all defaulting to `planning_poker`. Data lives in the `postgres-data` named volume.
@@ -246,6 +274,9 @@ See [`.env.example`](.env.example). Notable ones:
 | `PORT`                                     | api     | API port (default 4000)                                                       |
 | `CORS_ORIGIN`                              | api     | Allowed browser origins for REST and Socket.io, comma-separated               |
 | `SOCKET_DISCONNECT_GRACE_MS`               | api     | Reconnect window before a dropped socket counts as leaving (default 5000)     |
+| `ROOM_IDLE_HOURS`                          | api     | How long a room may sit unused before the sweep deletes it (default 24)       |
+| `ROOM_CLEANUP_INTERVAL_MS`                 | api     | How often that sweep runs (default 300000, i.e. every 5 minutes)              |
+| `ROOM_CLEANUP_ENABLED`                     | api     | Set to `false` to disable the sweep entirely (default enabled)                |
 | `NEXT_PUBLIC_API_URL`                      | web     | API base URL exposed to the browser                                           |
 | `NEXTAUTH_URL`, `NEXTAUTH_SECRET`          | web+api | NextAuth — required; the API verifies the session cookie with the same secret |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | web     | Google sign-in; leave empty to run with email/password only                   |
