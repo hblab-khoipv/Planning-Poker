@@ -108,6 +108,20 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   log name the exact cutoff it deleted by. Activity = write paths only (create/join/socket
   connect/vote/reveal/reset, all via `touchRoom`); reads never bump `last_active_at`, so polling
   cannot keep a dead room alive. README has the table and the env vars.
+- Deployment lives in `deploy/` + `.github/workflows/deploy.yml`, documented in `docs/deployment.md`.
+  Nothing is provisioned: task 10 was a _simulated_ deploy, so no EC2 instance, DNS record or
+  certificate exists and `deploy/scripts/bootstrap-server.sh` has never been executed.
+  `deploy/scripts/lib.sh`'s `run_step` is the ONLY place the `DEPLOY_SIMULATE` repository variable
+  is consulted — one script, two modes, so a simulated run is a real rehearsal of the live path.
+  Anything other than the literal `false` keeps simulation on. Never echo a secret: command lines
+  are printed from a display string built with `secret_ref`, never from the executed argv.
+- Production cannot put both apps on one hostname: the web app serves `/rooms/:code` as a page and
+  the API serves `/rooms/:code` as JSON. The API therefore gets `api.<domain>`, and
+  `AUTH_COOKIE_DOMAIN` (`apps/web/src/server/auth/cookie-domain.ts`) widens only NextAuth's session
+  cookie to the registrable domain so the API can still recognise a signed-in caller. Unset — local
+  and CI — means NextAuth's defaults, unchanged.
+- `NEXT_PUBLIC_API_URL` is baked into the browser bundle by `next build`, so changing it needs a
+  rebuild, not a restart; it is set in the deploy workflow's build job as well as in `web.env`.
 - Integration tests get fixtures from `apps/api/tests/helpers/seed.ts` (`seedRoomWithRound`,
   `truncateAll`); they build rows through the real repositories, so use them rather than raw INSERTs.
 

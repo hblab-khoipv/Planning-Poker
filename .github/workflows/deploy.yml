@@ -1,0 +1,135 @@
+name: Deploy
+
+# Builds both apps exactly as the real deploy would, then runs the deployment steps behind the
+# DEPLOY_SIMULATE switch (repository variable, default true). Simulation is a full run of the same
+# scripts with only the host-touching primitives — ssh, rsync, curl — printed instead of executed.
+on:
+  push:
+    branches: [main]
+  # A pull request that changes the deployment machinery gets a full rehearsal: the same build and
+  # the same scripts, forced into simulation regardless of the repository variable (see the
+  # "Resolve deployment mode" step). A PR can never deploy for real.
+  pull_request:
+    paths:
+      - '.github/workflows/deploy.yml'
+      - 'deploy/**'
+      - 'docs/deployment.md'
+  workflow_dispatch:
+    inputs:
+      simulate:
+        description: 'Simulate the deploy (never contacts the server)'
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  build:
+    name: Build release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all workspaces
+        # Next.js inlines NEXT_PUBLIC_* at build time, so the browser bundle's API origin is
+        # decided HERE, not by the env file on the server (see deploy/scripts/render-env.sh).
+        env:
+          NODE_ENV: production
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+        run: npm run build
+
+      - name: Stage the release tree
+        run: bash deploy/scripts/stage-release.sh "${GITHUB_WORKSPACE}/.deploy-stage"
+
+      - name: Upload the release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.sha }}
+          path: .deploy-stage
+          retention-days: 7
+          include-hidden-files: true
+
+  deploy:
+    name: Deploy to EC2
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-${{ github.sha }}
+          path: .deploy-stage
+
+      - name: Resolve deployment mode
+        id: mode
+        env:
+          # The repository variable is the standing setting; a manual run may simulate on top of
+          # it, but never the other way round — a live deploy has to be the repo's decision.
+          REPO_SIMULATE: ${{ vars.DEPLOY_SIMULATE }}
+          INPUT_SIMULATE: ${{ github.event.inputs.simulate }}
+        run: |
+          simulate=true
+          if [ "${GITHUB_EVENT_NAME}" != "pull_request" ] \
+             && [ "${REPO_SIMULATE}" = "false" ] \
+             && [ "${INPUT_SIMULATE:-false}" != "true" ]; then
+            simulate=false
+          fi
+          echo "simulate=${simulate}" >> "$GITHUB_OUTPUT"
+          echo "DEPLOY_SIMULATE=${simulate}" >> "$GITHUB_ENV"
+          echo "### Deploy mode: \`$( [ "$simulate" = true ] && echo SIMULATE || echo LIVE )\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Render server env files
+        # Real in both modes: it writes only into the runner's staging directory. It prints key
+        # names and value lengths, never values.
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          NEXTAUTH_URL: ${{ vars.NEXTAUTH_URL }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          AUTH_COOKIE_DOMAIN: ${{ vars.AUTH_COOKIE_DOMAIN }}
+          CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
+          API_PORT: ${{ vars.API_PORT }}
+          SOCKET_DISCONNECT_GRACE_MS: ${{ vars.SOCKET_DISCONNECT_GRACE_MS }}
+        run: bash deploy/scripts/render-env.sh "${GITHUB_WORKSPACE}/.deploy-stage"
+
+      - name: Deploy
+        env:
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ vars.EC2_USER }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          APP_DOMAIN: ${{ vars.APP_DOMAIN }}
+          API_PORT: ${{ vars.API_PORT }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          RELEASE_ID: ${{ github.sha }}
+        run: bash deploy/scripts/deploy.sh "${GITHUB_WORKSPACE}/.deploy-stage"
+
+      - name: Summarise
+        if: always()
+        run: |
+          {
+            if [ "${{ steps.mode.outputs.simulate }}" = "true" ]; then
+              echo "No SSH connection was opened and no AWS resource was touched."
+              echo ""
+              echo "To deploy for real: set the repository variable \`DEPLOY_SIMULATE\` to \`false\`"
+              echo "after filling in every secret and variable listed in \`docs/deployment.md\`."
+            else
+              echo "Live deploy to \`${{ vars.APP_DOMAIN }}\`."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

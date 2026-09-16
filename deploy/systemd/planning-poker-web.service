@@ -1,0 +1,29 @@
+# Next.js server. Installed at /etc/systemd/system/planning-poker-web.service.
+# `next start` serves the .next build shipped in the release — it never builds on the box.
+[Unit]
+Description=Planning Poker web (Next.js)
+After=network-online.target planning-poker-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=planningpoker
+Group=planningpoker
+WorkingDirectory=/opt/planning-poker/current/apps/web
+EnvironmentFile=/opt/planning-poker/env/web.env
+ExecStart=/opt/planning-poker/current/node_modules/.bin/next start --port 3000
+Restart=always
+RestartSec=2
+KillSignal=SIGTERM
+TimeoutStopSec=15
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=planning-poker-web
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/planning-poker
+
+[Install]
+WantedBy=multi-user.target
