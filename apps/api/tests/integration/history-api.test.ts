@@ -229,7 +229,7 @@ describe('session history API', () => {
           { participantId: guestSeatId, value: '5', originalValue: null, editedAt: null },
         ]),
       );
-      // The same numbers task 6 computed when the host pressed "Lộ bài".
+      // The same numbers task 6 computed when the host pressed "Lật bài".
       expect(first.tally).toMatchObject({
         voteCount: 2,
         numericCount: 2,

@@ -9,7 +9,7 @@
 
 ## 1. Tổng quan
 
-Planning Poker là công cụ giúp team (thường là team phát triển phần mềm) ước lượng story point cho các task/story trong buổi refinement/sprint planning, theo mô hình mỗi thành viên chọn một thẻ điểm số kín, sau đó tất cả cùng lộ (reveal) kết quả một lúc để tránh hiệu ứng đám đông (anchoring bias).
+Planning Poker là công cụ giúp team (thường là team phát triển phần mềm) ước lượng story point cho các task/story trong buổi refinement/sprint planning, theo mô hình mỗi thành viên chọn một thẻ điểm số kín, sau đó tất cả cùng lật (reveal) kết quả một lúc để tránh hiệu ứng đám đông (anchoring bias).
 
 Sản phẩm là một **web app real-time**: người tham gia join vào một phòng qua link, vote đồng thời, và thấy kết quả cập nhật trực tiếp không cần refresh trang.
 
@@ -32,9 +32,9 @@ Use case chính: "Là Scrum Master, tôi tạo một phòng, gửi link cho team
    - Khách (guest): chỉ cần nhập tên hiển thị, không cần tài khoản.
    - Người dùng đã đăng nhập: tự động dùng tên tài khoản, có thể đổi tên hiển thị cho phòng đó.
 3. Đăng ký/đăng nhập tài khoản (email + mật khẩu hoặc magic link, **và đăng nhập social qua Google**) — không bắt buộc để dùng app.
-4. Trong phòng: danh sách người tham gia real-time, trạng thái mỗi người (đã vote / chưa vote — không lộ giá trị).
+4. Trong phòng: danh sách người tham gia real-time, trạng thái mỗi người (đã vote / chưa vote — không lật giá trị).
 5. Vote: mỗi người chọn 1 thẻ trong bộ thẻ của phòng; có thể đổi vote trước khi reveal.
-6. Reveal: host bấm "Lộ bài" để hiện toàn bộ giá trị vote của mọi người cùng lúc.
+6. Reveal: host bấm "Lật bài" để hiện toàn bộ giá trị vote của mọi người cùng lúc.
 7. Kết quả sau reveal: liệt kê vote từng người, tính trung bình và median (nếu deck là số), cảnh báo/đồng thuận nếu tất cả trùng giá trị.
 8. Vote lại (New round / Revote): reset vote để làm lại cho cùng một mục hoặc chuyển sang mục tiếp theo.
 9. Rời phòng; phòng tự động dọn sau một khoảng thời gian không hoạt động (ví dụ 24h).
@@ -59,7 +59,7 @@ Use case chính: "Là Scrum Master, tôi tạo một phòng, gửi link cho team
 3. Host copy link gửi cho team qua Slack/Teams.
 4. Thành viên mở link → nếu chưa đăng nhập, nhập tên hiển thị → vào phòng.
 5. Mọi người thấy danh sách thành viên trong phòng, mỗi người chọn 1 thẻ điểm cho task đang thảo luận (thảo luận diễn ra ngoài app, ví dụ trên call).
-6. Khi đủ người vote (hoặc host chủ động), host bấm "Lộ bài" → tất cả giá trị hiện ra cùng lúc, kèm trung bình/median.
+6. Khi đủ người vote (hoặc host chủ động), host bấm "Lật bài" → tất cả giá trị hiện ra cùng lúc, kèm trung bình/median.
 7. Nếu chưa đồng thuận, host bấm "Vote lại" để làm round mới cho cùng task.
 8. Nếu đồng thuận, host bấm "Task tiếp theo / Round mới" để chuyển sang ước lượng mục kế tiếp.
 9. Kết thúc buổi, host hoặc thành viên rời phòng. Nếu đã đăng nhập, phiên này lưu vào lịch sử để xem lại sau.
@@ -72,7 +72,7 @@ Use case chính: "Là Scrum Master, tôi tạo một phòng, gửi link cho team
 | FR-2 | Join phòng | User vào phòng qua link/code, nhập tên hiển thị nếu là guest. |
 | FR-3 | Danh sách người tham gia real-time | Mọi client trong phòng thấy danh sách cập nhật ngay khi có người vào/ra/đổi trạng thái vote. |
 | FR-4 | Vote | User chọn 1 thẻ trong deck của phòng; giá trị được giữ kín với người khác cho tới khi reveal; user có thể đổi vote trước khi reveal. |
-| FR-5 | Reveal | Host (người tạo phòng hoặc người được gán quyền) bấm để lộ toàn bộ vote cùng lúc cho mọi client. |
+| FR-5 | Reveal | Host (người tạo phòng hoặc người được gán quyền) bấm để lật toàn bộ vote cùng lúc cho mọi client. |
 | FR-6 | Tổng hợp kết quả | Sau reveal: hiển thị bảng vote theo tên, tính trung bình/median (deck số), đánh dấu đồng thuận khi tất cả giống nhau. |
 | FR-7 | Round mới / Vote lại | Reset trạng thái vote của tất cả thành viên trong phòng để bắt đầu round tiếp theo. |
 | FR-8 | Đăng ký/đăng nhập | Tài khoản qua email, hoặc social login (Google — mặc định cho MVP), dùng để lưu lịch sử; không bắt buộc để tạo/join phòng. |
@@ -106,7 +106,7 @@ Use case chính: "Là Scrum Master, tôi tạo một phòng, gửi link cho team
 |---------|-------------|----------------|
 | `participant:joined` | Có người vào phòng | participant info |
 | `participant:left` | Có người rời phòng | participant_id |
-| `vote:cast` | Một người vote (chưa lộ giá trị) | participant_id, has_voted = true |
+| `vote:cast` | Một người vote (chưa lật giá trị) | participant_id, has_voted = true |
 | `round:revealed` | Host bấm reveal | toàn bộ votes của round, avg, median |
 | `round:reset` | Host bấm round mới/vote lại | round_id mới, status = voting |
 
@@ -115,7 +115,7 @@ Use case chính: "Là Scrum Master, tôi tạo một phòng, gửi link cho team
 1. **Trang chủ:** nút "Tạo phòng mới", ô nhập mã phòng để join, tùy chọn đăng nhập/đăng ký.
 2. **Tạo phòng:** nhập tên phòng, chọn bộ thẻ điểm.
 3. **Join phòng:** nhập tên hiển thị (nếu là guest).
-4. **Phòng chính:** danh sách thành viên (kèm trạng thái đã vote), bộ thẻ để chọn, nút "Lộ bài" (chỉ host thấy), khu vực kết quả sau reveal, nút "Round mới".
+4. **Phòng chính:** danh sách thành viên (kèm trạng thái đã vote), bộ thẻ để chọn, nút "Lật bài" (chỉ host thấy), khu vực kết quả sau reveal, nút "Round mới".
 5. **Đăng nhập/Đăng ký:** form email + mật khẩu, magic link, hoặc nút "Đăng nhập với Google".
 6. **Lịch sử phiên:** danh sách phòng đã tham gia (chỉ hiện khi đã đăng nhập), click vào xem lại kết quả từng round.
 
@@ -137,7 +137,7 @@ Use case chính: "Là Scrum Master, tôi tạo một phòng, gửi link cho team
 ## 12. Rủi ro & câu hỏi mở cần xác nhận trước khi code
 
 - Xác nhận chọn Supabase hay tự dựng backend riêng (ảnh hưởng lớn đến tốc độ build và chi phí vận hành).
-- Ai được quyền bấm "Lộ bài" — chỉ host, hay bất kỳ ai trong phòng?
+- Ai được quyền bấm "Lật bài" — chỉ host, hay bất kỳ ai trong phòng?
 - Có cần giới hạn số phòng/số người tạo bởi 1 guest để tránh spam không?
 - Xử lý khi mất kết nối giữa chừng (rớt mạng) — có tự động reconnect và giữ nguyên vote đã chọn không?
 - Social login chỉ cần Google, hay cần thêm Microsoft/GitHub (ví dụ nếu công ty dùng email @hblab.vn qua Google Workspace hoặc Microsoft 365)?
