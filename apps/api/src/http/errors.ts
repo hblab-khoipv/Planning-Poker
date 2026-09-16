@@ -22,6 +22,23 @@ export function badRequest(message: string): HttpError {
   return new HttpError(400, 'validation_error', message);
 }
 
+/** No signed-in caller, on an endpoint that has nothing to offer a guest (FR-9's history). */
+export function unauthorized(message: string): HttpError {
+  return new HttpError(401, 'unauthorized', message);
+}
+
+/**
+ * A signed-in caller asking for somebody else's data.
+ *
+ * Distinct from `notFound` on purpose: the room code in the URL is one the caller already holds
+ * (it is the invite link), so "this room exists but is not yours" tells them nothing they could
+ * not confirm by joining it, and answering 404 would send somebody who simply lost their seat
+ * hunting for a room that is still there.
+ */
+export function forbidden(message: string): HttpError {
+  return new HttpError(403, 'forbidden', message);
+}
+
 export function errorBody(code: ApiErrorCode, message: string): ApiErrorResponse {
   return { error: { code, message } };
 }

@@ -89,6 +89,17 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 - `room_participants.is_online` is written by the socket layer on connect and on a grace-expired
   disconnect, so `GET /rooms/:code/participants` and the socket stream cannot disagree. A seat is
   never deleted on disconnect — it still holds a vote.
+- Session history (FR-9) is account-only and says so structurally: `db/repositories/history.ts`
+  filters on `room_participants.user_id`, which no guest seat (NULL `user_id`) can match, and
+  `GET /users/me/rooms` has no id in its path to tamper with. The pure predicate is
+  `http/history.ts`'s `canViewRoomHistory` — the neighbour of `http/authority.ts`'s `isRoomHost`.
+  History round payloads go through `toRoundStateDto` like everything else, so a never-revealed
+  round keeps its cards hidden long after the meeting.
+- A browser's API calls must reach the API on the **same hostname as the page**: NextAuth's cookie
+  is scoped to a host and ignores the port, so a page on 127.0.0.1 calling `localhost:4000` sends
+  no cookie and every authenticated read silently 401s. `apiBaseUrl()` derives the host from
+  `window.location` when `NEXT_PUBLIC_API_URL` is unset; do not replace that with a constant.
+  For the same reason `playwright.config.ts` hands both e2e servers one `NEXTAUTH_SECRET`.
 - Integration tests get fixtures from `apps/api/tests/helpers/seed.ts` (`seedRoomWithRound`,
   `truncateAll`); they build rows through the real repositories, so use them rather than raw INSERTs.
 

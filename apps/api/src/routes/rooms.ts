@@ -1,4 +1,8 @@
-import { isDeckType, MAX_GUEST_NAME_LENGTH } from '@planning-poker/shared';
+import {
+  isDeckType,
+  MAX_GUEST_NAME_LENGTH,
+  type RoomHistoryDetailResponse,
+} from '@planning-poker/shared';
 import { Router } from 'express';
 import type pg from 'pg';
 import {
@@ -8,6 +12,8 @@ import {
   ensureCurrentRound,
   findRoomByCode,
   findUserById,
+  isRoomMember,
+  listRoundsWithVotes,
   listVotesForRound,
   type Participant,
   type Queryable,
@@ -23,7 +29,8 @@ import {
 } from '../db/repositories/participants.js';
 import { withTransaction } from '../db/transaction.js';
 import { toParticipantDto, toRoomDto, toRoundStateDto } from '../http/dto.js';
-import { asyncRoute, badRequest, notFound } from '../http/errors.js';
+import { asyncRoute, badRequest, forbidden, notFound, unauthorized } from '../http/errors.js';
+import { canViewRoomHistory, toRoundHistoryEntryDto } from '../http/history.js';
 import { resolveCaller } from '../http/session.js';
 
 /**
@@ -236,6 +243,51 @@ export function createRoomsRouter(pool: pg.Pool): Router {
       const votes = await listVotesForRound(pool, round.id);
 
       res.status(200).json(toRoundStateDto(round, votes, room.deckType));
+    }),
+  );
+
+  /**
+   * FR-9: every round this room has had, with the results of the ones that were revealed.
+   *
+   * The same data the room computed live at reveal time (task 6), asked for after the fact —
+   * and computed the same way, since each entry goes through `toRoundStateDto`. A round still
+   * `voting` when everyone went home therefore appears in the list with its votes withheld,
+   * exactly as it would in the room itself.
+   *
+   * Membership is checked against `room_participants.user_id`, so knowing a room code is not
+   * enough: the invite link gets you into a room, not into its archive.
+   */
+  router.get(
+    '/:code/rounds',
+    asyncRoute(async (req, res) => {
+      const caller = await resolveCaller(req);
+      const room = await requireRoom(pool, req.params.code ?? '');
+
+      const isMember = caller ? await isRoomMember(pool, room.id, caller.userId) : false;
+      if (!canViewRoomHistory({ callerUserId: caller?.userId ?? null, isMember })) {
+        // 401 and 403 answer different questions, and the history screen shows different things
+        // for them: "sign in" versus "this session is not one of yours".
+        throw caller
+          ? forbidden('you did not take part in this room')
+          : unauthorized('you must be signed in to see session history');
+      }
+
+      const [participants, rounds] = await Promise.all([
+        listParticipantsWithUsers(pool, room.id),
+        listRoundsWithVotes(pool, room.id),
+      ]);
+
+      const body: RoomHistoryDetailResponse = {
+        room: toRoomDto(room),
+        participants: participants.map((participant) =>
+          toParticipantDto(participant, {
+            hostId: room.hostId,
+            hostParticipantId: room.hostParticipantId,
+          }),
+        ),
+        rounds: rounds.map((entry) => toRoundHistoryEntryDto(entry, room.deckType)),
+      };
+      res.status(200).json(body);
     }),
   );
 

@@ -75,7 +75,16 @@ export interface ApiErrorResponse {
   };
 }
 
-export const API_ERROR_CODES = ['validation_error', 'not_found', 'conflict', 'internal'] as const;
+export const API_ERROR_CODES = [
+  'validation_error',
+  /** The caller is not signed in, and the endpoint has nothing to show a guest (FR-9). */
+  'unauthorized',
+  /** The caller is signed in, but this is somebody else's room. */
+  'forbidden',
+  'not_found',
+  'conflict',
+  'internal',
+] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
