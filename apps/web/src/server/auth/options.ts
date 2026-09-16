@@ -3,6 +3,7 @@ import type { NextAuthOptions } from 'next-auth';
 import type { Adapter } from 'next-auth/adapters';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
+import { sessionCookieOverride } from '@/server/auth/cookie-domain';
 import { authenticateWithPassword } from '@/server/auth/credentials';
 import { getPool } from '@/server/db/pool';
 
@@ -78,6 +79,8 @@ export const authOptions: NextAuthOptions = {
   // Adapter type; the cast bridges the two package boundaries, not a behavioural difference.
   adapter: PostgresAdapter(getPool()) as Adapter,
   providers: providers(),
+  // Only set in the EC2 deployment, where the API answers on its own subdomain.
+  cookies: sessionCookieOverride(),
   session: {
     // Forced by the Credentials provider: next-auth v4 refuses to issue database sessions for it,
     // because a credentials login never goes through the adapter. The adapter still owns users,

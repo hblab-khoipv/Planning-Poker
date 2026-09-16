@@ -1,0 +1,34 @@
+# Express + Socket.io API. Installed at /etc/systemd/system/planning-poker-api.service.
+#
+# Process manager choice: systemd, not pm2. The box is a single EC2 instance that already runs
+# systemd, so this adds no runtime, no global npm install and no extra process to supervise the
+# supervisor; boot ordering (after docker, for Postgres), restart policy, log rotation via
+# journald and `systemctl status` all come for free. pm2 would duplicate every one of those.
+[Unit]
+Description=Planning Poker API (Express + Socket.io)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=planningpoker
+Group=planningpoker
+WorkingDirectory=/opt/planning-poker/current
+EnvironmentFile=/opt/planning-poker/env/api.env
+ExecStart=/usr/bin/node apps/api/dist/server.js
+Restart=always
+RestartSec=2
+# Socket.io holds long-lived connections; give them a moment to drain on restart.
+KillSignal=SIGTERM
+TimeoutStopSec=15
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=planning-poker-api
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/planning-poker
+
+[Install]
+WantedBy=multi-user.target
