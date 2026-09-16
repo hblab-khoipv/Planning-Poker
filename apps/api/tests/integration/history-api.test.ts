@@ -297,7 +297,15 @@ describe('session history API', () => {
       expect(unrevealed.tally).toBeNull();
       // Who voted is public before a reveal; what they voted is not.
       expect(unrevealed.votedParticipantIds).toEqual([memberSeatId]);
-      expect(JSON.stringify(unrevealed)).not.toContain('21');
+      // Belt and braces: the value must appear nowhere in the payload. Opaque identifiers and
+      // timestamps are dropped first — a uuid is hex and an ISO clock is digits, so either can
+      // contain a card's digits by coincidence and fail this for the wrong reason.
+      const withoutIdentifiers = JSON.stringify(unrevealed, (key, value) =>
+        key === 'id' || key === 'createdAt' || key === 'revealedAt' || key === 'votedParticipantIds'
+          ? undefined
+          : value,
+      );
+      expect(withoutIdentifiers).not.toContain('21');
     });
 
     it('refuses a signed-in user who did not take part in the room', async () => {
