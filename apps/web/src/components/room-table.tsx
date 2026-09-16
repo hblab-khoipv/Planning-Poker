@@ -144,7 +144,7 @@ export function RoomTable({
               }`}
             >
               <span data-testid="table-status">
-                {isRevealed ? 'Bài đã lộ' : 'Đang chờ mọi người chọn bài…'}
+                {isRevealed ? 'Bài đã lật' : 'Đang chờ mọi người chọn bài…'}
               </span>
             </div>
 

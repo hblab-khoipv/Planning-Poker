@@ -28,8 +28,8 @@ export function formatTimestamp(iso: string): string {
 /** What the list card says about a room's rounds, including the "nothing revealed" case. */
 export function summarizeRounds(entry: { roundCount: number; revealedRoundCount: number }): string {
   if (entry.roundCount === 0) return 'Chưa có round nào';
-  if (entry.revealedRoundCount === 0) return `${entry.roundCount} round · chưa lộ bài round nào`;
-  return `${entry.roundCount} round · ${entry.revealedRoundCount} đã lộ bài`;
+  if (entry.revealedRoundCount === 0) return `${entry.roundCount} round · chưa lật bài round nào`;
+  return `${entry.roundCount} round · ${entry.revealedRoundCount} đã lật bài`;
 }
 
 /**

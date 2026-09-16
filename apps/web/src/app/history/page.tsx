@@ -48,7 +48,7 @@ export default function HistoryPage() {
         <p className="text-sm uppercase tracking-widest text-indigo-400">Lịch sử</p>
         <h1 className="text-3xl font-bold tracking-tight">Phiên đã tham gia</h1>
         <p className="text-sm text-slate-400">
-          Các phòng bạn đã tạo hoặc tham gia, kèm kết quả những round đã lộ bài.
+          Các phòng bạn đã tạo hoặc tham gia, kèm kết quả những round đã lật bài.
         </p>
       </header>
 
@@ -116,8 +116,8 @@ export default function HistoryPage() {
                   </p>
                   <p className="text-xs text-slate-500" data-testid="history-room-revealed-at">
                     {entry.lastRevealedAt
-                      ? `Lộ bài gần nhất: ${formatTimestamp(entry.lastRevealedAt)}`
-                      : 'Chưa có round nào được lộ bài'}
+                      ? `Lật bài gần nhất: ${formatTimestamp(entry.lastRevealedAt)}`
+                      : 'Chưa có round nào được lật bài'}
                   </p>
                 </Link>
               </li>

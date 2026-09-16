@@ -67,14 +67,14 @@ export function VoteDeck({
 
       {disabled ? (
         <p className="text-sm text-slate-400" data-testid="deck-locked">
-          Round đã lộ bài. Bấm “Sửa bài” trên lá bài của bạn nếu muốn đổi, hoặc chờ host mở round
+          Round đã lật bài. Bấm “Sửa bài” trên lá bài của bạn nếu muốn đổi, hoặc chờ host mở round
           mới.
         </p>
       ) : null}
 
       {editing ? (
         <p className="text-sm text-amber-300" data-testid="deck-editing">
-          Bạn đang sửa lá bài đã lộ — thẻ mới sẽ được đánh dấu “đã sửa” cho cả phòng thấy.
+          Bạn đang sửa lá bài đã lật — thẻ mới sẽ được đánh dấu “đã sửa” cho cả phòng thấy.
         </p>
       ) : null}
     </section>

@@ -49,7 +49,7 @@ import {
  *    already flipped to `revealed`. There is no ordering of these calls that reveals early.
  * 2. **Authority is re-read, never remembered.** The room resolved at handshake is a snapshot;
  *    reveal and reset load the room again so the decision is made against the current row.
- * 3. **Refusals are private.** A non-host who clicks "Lộ bài" gets an acknowledgement, not an
+ * 3. **Refusals are private.** A non-host who clicks "Lật bài" gets an acknowledgement, not an
  *    event — the room never learns somebody tried, and the socket stays up.
  *
  * Issue #11 adds a fourth action, `vote:edit`: changing one's own card after the room has seen
@@ -118,7 +118,7 @@ export async function requireOpenRound(db: Queryable, roomId: string): Promise<V
   if (!locked || locked.status !== 'voting') {
     throw new VoteActionError(
       VOTE_ERROR_CODES.ROUND_NOT_OPEN,
-      'round đã được lộ bài, hãy chờ round mới',
+      'round đã được lật bài, hãy chờ round mới',
     );
   }
   return locked;
@@ -141,7 +141,7 @@ export async function requireRevealedRound(db: Queryable, roomId: string): Promi
   if (!locked || locked.status !== 'revealed') {
     throw new VoteActionError(
       VOTE_ERROR_CODES.ROUND_NOT_REVEALED,
-      'round chưa lộ bài, hãy chọn thẻ như bình thường',
+      'round chưa lật bài, hãy chọn thẻ như bình thường',
     );
   }
   return locked;
@@ -285,12 +285,12 @@ export async function handleRoundReveal(
 
   const current = await findCurrentRound(pool, room.id);
   if (!current) {
-    throw new VoteActionError(VOTE_ERROR_CODES.NO_ROUND, 'phòng chưa có round nào để lộ bài');
+    throw new VoteActionError(VOTE_ERROR_CODES.NO_ROUND, 'phòng chưa có round nào để lật bài');
   }
 
   const revealed = (await revealRound(pool, current.id)) ?? (await findRoundById(pool, current.id));
   if (!revealed || revealed.status !== 'revealed') {
-    throw new VoteActionError(VOTE_ERROR_CODES.ROUND_NOT_OPEN, 'round không thể lộ bài');
+    throw new VoteActionError(VOTE_ERROR_CODES.ROUND_NOT_OPEN, 'round không thể lật bài');
   }
 
   const votes = await listVotesForRound(pool, revealed.id);

@@ -96,8 +96,8 @@ test.describe('session history', () => {
     await expect(entry).toBeVisible();
     await expect(entry.getByTestId('history-room-name')).toHaveText(roomName);
     await expect(entry.getByTestId('history-room-participants')).toHaveText('2 người');
-    await expect(entry.getByTestId('history-room-rounds')).toContainText('1 đã lộ bài');
-    await expect(entry.getByTestId('history-room-revealed-at')).toContainText('Lộ bài gần nhất');
+    await expect(entry.getByTestId('history-room-rounds')).toContainText('1 đã lật bài');
+    await expect(entry.getByTestId('history-room-revealed-at')).toContainText('Lật bài gần nhất');
 
     // --- the drill-in: the round's own results, as the room saw them --------------------
     await entry.click();
@@ -108,7 +108,7 @@ test.describe('session history', () => {
     const round = page.getByTestId('room-history-round');
     await expect(round).toHaveCount(1);
     await expect(round).toHaveAttribute('data-round-number', '1');
-    await expect(round.getByTestId('round-revealed-at')).toContainText('Lộ bài lúc');
+    await expect(round.getByTestId('round-revealed-at')).toContainText('Lật bài lúc');
     // The same numbers the room ended on: 5 and 3 → average 4, median 4, no consensus.
     await expect(round.getByTestId('results-average')).toHaveText('4');
     await expect(round.getByTestId('results-median')).toHaveText('4');

@@ -1,10 +1,10 @@
 -- Gives every room a host, including the guest-created ones (PRD §12's open question
--- "Ai được quyền bấm 'Lộ bài'", resolved for the MVP as: only the host).
+-- "Ai được quyền bấm 'Lật bài'", resolved for the MVP as: only the host).
 --
 -- `rooms.host_id` cannot answer that question on its own. It references `users`, so it is NULL
 -- whenever a guest created the room (PRD §7: "nullable nếu host là guest") -- and a guest-created
 -- room is the primary MVP flow. Without this column such a room has no host at all, and FR-5's
--- "Lộ bài" would be a button nobody in the room is ever allowed to press.
+-- "Lật bài" would be a button nobody in the room is ever allowed to press.
 --
 -- host_participant_id points at the creator's seat instead, which exists for guests and members
 -- alike. Authority is the OR of the two (see apps/api/src/http/authority.ts): the seat is the

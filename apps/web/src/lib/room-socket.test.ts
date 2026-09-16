@@ -166,7 +166,7 @@ describe('messageForActionError', () => {
     ).toMatch(/Chỉ host/);
     expect(
       messageForActionError({ ok: false, code: VOTE_ERROR_CODES.ROUND_NOT_OPEN, message: 'nope' }),
-    ).toMatch(/đã lộ bài/);
+    ).toMatch(/đã lật bài/);
     expect(
       messageForActionError({ ok: false, code: VOTE_ERROR_CODES.INVALID_CARD, message: 'nope' }),
     ).toMatch(/không thuộc bộ thẻ/);

@@ -42,11 +42,11 @@ describe('formatTimestamp', () => {
 
 describe('summarizeRounds', () => {
   it('counts rounds and how many were revealed', () => {
-    expect(summarizeRounds({ roundCount: 3, revealedRoundCount: 2 })).toBe('3 round · 2 đã lộ bài');
+    expect(summarizeRounds({ roundCount: 3, revealedRoundCount: 2 })).toBe('3 round · 2 đã lật bài');
   });
 
   it('says so when a room has rounds but none were revealed', () => {
-    expect(summarizeRounds({ roundCount: 2, revealedRoundCount: 0 })).toContain('chưa lộ bài');
+    expect(summarizeRounds({ roundCount: 2, revealedRoundCount: 0 })).toContain('chưa lật bài');
   });
 
   it('handles a room with no rounds at all', () => {

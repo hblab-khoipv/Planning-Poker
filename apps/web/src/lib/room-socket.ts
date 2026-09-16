@@ -157,11 +157,11 @@ export function messageForActionError(ack: ActionAck): string | null {
   if (ack.ok) return null;
   switch (ack.code) {
     case VOTE_ERROR_CODES.NOT_HOST:
-      return 'Chỉ host mới lộ bài hoặc mở round mới được.';
+      return 'Chỉ host mới lật bài hoặc mở round mới được.';
     case VOTE_ERROR_CODES.ROUND_NOT_OPEN:
-      return 'Round này đã lộ bài, hãy chờ host mở round mới.';
+      return 'Round này đã lật bài, hãy chờ host mở round mới.';
     case VOTE_ERROR_CODES.ROUND_NOT_REVEALED:
-      return 'Round chưa lộ bài — hãy chọn thẻ như bình thường.';
+      return 'Round chưa lật bài — hãy chọn thẻ như bình thường.';
     case VOTE_ERROR_CODES.NO_VOTE:
       return 'Bạn chưa vote ở round này nên không có bài để sửa.';
     case VOTE_ERROR_CODES.INVALID_CARD:

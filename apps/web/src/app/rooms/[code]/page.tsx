@@ -299,7 +299,7 @@ export default function RoomPage() {
           <p className="text-sm text-slate-400">
             Round <span data-testid="round-number">{round.roundNumber}</span> ·{' '}
             <span data-testid="round-status" data-state={round.status}>
-              {isRevealed ? 'Đã lộ bài' : 'Đang vote'}
+              {isRevealed ? 'Đã lật bài' : 'Đang vote'}
             </span>
           </p>
         ) : null}
@@ -379,7 +379,7 @@ export default function RoomPage() {
               onClick={onReveal}
               className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-400"
             >
-              Lộ bài
+              Lật bài
             </button>
           )}
         </div>

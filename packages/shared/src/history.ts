@@ -23,7 +23,7 @@ export interface RoomHistoryEntryDto {
   revealedRoundCount: number;
   /**
    * When the room last had its cards turned over, or null for a room where nobody ever
-   * revealed. The list screen says "chưa có round nào được lộ bài" rather than hiding the room:
+   * revealed. The list screen says "chưa có round nào được Lật bài" rather than hiding the room:
    * a session that ended without a reveal is still a session the user was in.
    */
   lastRevealedAt: string | null;
