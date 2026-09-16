@@ -127,6 +127,7 @@ export default function RoomHistoryPage() {
                   participants={detail.participants}
                   votesByParticipant={votesByParticipantId(entry)}
                   tally={entry.tally}
+                  deckType={detail.room.deckType}
                 />
               ) : (
                 <p data-testid="round-not-revealed" className="text-sm text-slate-400">

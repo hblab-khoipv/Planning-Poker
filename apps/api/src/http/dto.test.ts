@@ -107,6 +107,8 @@ describe('toRoundStateDto', () => {
       participantId: 'p1',
       value: '5',
       votedAt: new Date('2026-09-15T00:00:01.000Z'),
+      originalValue: null,
+      editedAt: null,
     },
     {
       id: 'v2',
@@ -114,6 +116,8 @@ describe('toRoundStateDto', () => {
       participantId: 'p2',
       value: '5',
       votedAt: new Date('2026-09-15T00:00:02.000Z'),
+      originalValue: null,
+      editedAt: null,
     },
   ];
 
@@ -147,8 +151,8 @@ describe('toRoundStateDto', () => {
 
     expect(state.round).toMatchObject({ status: 'revealed', roundNumber: 2 });
     expect(state.votes).toEqual([
-      { participantId: 'p1', value: '5' },
-      { participantId: 'p2', value: '5' },
+      { participantId: 'p1', value: '5', originalValue: null, editedAt: null },
+      { participantId: 'p2', value: '5', originalValue: null, editedAt: null },
     ]);
     expect(state.tally).toEqual({
       voteCount: 2,
@@ -157,6 +161,51 @@ describe('toRoundStateDto', () => {
       median: 5,
       consensus: true,
     });
+  });
+
+  it('carries the card an edit replaced, alongside the one that replaced it (issue #11)', () => {
+    const state = toRoundStateDto(
+      REVEALED_ROUND,
+      [
+        {
+          ...(VOTES[0] as (typeof VOTES)[number]),
+          value: '3',
+          originalValue: '5',
+          editedAt: new Date('2026-09-15T00:00:20.000Z'),
+        },
+        VOTES[1] as (typeof VOTES)[number],
+      ],
+      'fibonacci',
+    );
+
+    expect(state.votes[0]).toEqual({
+      participantId: 'p1',
+      value: '3',
+      originalValue: '5',
+      editedAt: '2026-09-15T00:00:20.000Z',
+    });
+    // The numbers follow the cards as they stand now: 3 and 5, not the reveal's 5 and 5.
+    expect(state.tally).toMatchObject({ average: 4, median: 4, consensus: false });
+  });
+
+  it('withholds the edit evidence too while the round is open', () => {
+    // The evidence names a card, so it is exactly as secret as the card until the reveal.
+    const state = toRoundStateDto(
+      OPEN_ROUND,
+      [
+        {
+          ...(VOTES[0] as (typeof VOTES)[number]),
+          value: '3',
+          originalValue: '5',
+          editedAt: new Date('2026-09-15T00:00:20.000Z'),
+        },
+      ],
+      'fibonacci',
+    );
+
+    expect(state.votes).toEqual([]);
+    expect(JSON.stringify(state)).not.toContain('"5"');
+    expect(JSON.stringify(state)).not.toContain('editedAt');
   });
 
   it('gives a t-shirt room consensus without inventing an average', () => {

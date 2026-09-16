@@ -8,18 +8,20 @@ import {
   type ParticipantLeftPayload,
   parseRoomCode,
   type RoomDto,
+  type RevealedVoteDto,
   type RoomStatePayload,
   type RoundDto,
   type RoundResetPayload,
   type RoundRevealedPayload,
   type RoundTally,
   type VoteCastPayload,
+  type VoteEditedPayload,
 } from '@planning-poker/shared';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { InviteLink } from '@/components/invite-link';
-import { ParticipantList } from '@/components/participant-list';
+import { RoomTable } from '@/components/room-table';
 import { RoundResults } from '@/components/round-results';
 import { VoteDeck } from '@/components/vote-deck';
 import { fetchParticipants, fetchRoom, messageForError } from '@/lib/api-client';
@@ -31,6 +33,7 @@ import {
   applyVoteCast,
   castVote,
   connectToRoom,
+  editVote,
   messageForActionError,
   resetRound,
   revealRound,
@@ -70,11 +73,20 @@ export default function RoomPage() {
   const [round, setRound] = useState<RoundDto | null>(null);
   const [votedIds, setVotedIds] = useState<ReadonlySet<string>>(new Set());
   const [revealed, setRevealed] = useState<{
-    votes: Map<string, string>;
+    votes: Map<string, RevealedVoteDto>;
     tally: RoundTally;
   } | null>(null);
   const [myVote, setMyVote] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  /**
+   * Whether this browser has asked to change its own card after the reveal (issue #11).
+   *
+   * The deck is locked once the cards are up, and this is the one thing that unlocks it — for
+   * this browser, for its own seat. It is local state rather than anything the server knows,
+   * because nobody else has any business seeing that somebody is *considering* a change; what
+   * the room learns is the change itself, once it is made.
+   */
+  const [editingVote, setEditingVote] = useState(false);
 
   // Held in a ref rather than state: the handlers need the live socket, and re-rendering when it
   // changes would tear the room's event subscriptions down mid-round.
@@ -159,6 +171,20 @@ export default function RoomPage() {
       setRound(payload.round);
       setVotedIds(new Set(payload.votes.map((vote) => vote.participantId)));
       setRevealed({ votes: votesByParticipant(payload.votes), tally: payload.tally });
+      setEditingVote(false);
+    });
+
+    // Issue #11: somebody changed their card after the reveal. The payload carries the round's
+    // whole state, so this is a replacement rather than a patch — which is what makes it safe to
+    // apply twice, or out of order with another edit.
+    socket.on(SOCKET_EVENTS.VOTE_EDITED, (payload: VoteEditedPayload) => {
+      setRound(payload.round);
+      setRevealed({ votes: votesByParticipant(payload.votes), tally: payload.tally });
+      if (payload.participantId === mySeatId) {
+        const mine = payload.votes.find((vote) => vote.participantId === mySeatId);
+        setMyVote(mine?.value ?? null);
+        setEditingVote(false);
+      }
     });
 
     // A reset clears every trace of the previous round, this browser's own card included.
@@ -168,6 +194,7 @@ export default function RoomPage() {
       setRevealed(null);
       setMyVote(null);
       setActionError(null);
+      setEditingVote(false);
     });
 
     return () => {
@@ -200,6 +227,16 @@ export default function RoomPage() {
 
   const onSelectCard = useCallback(
     (value: string) => {
+      // After the reveal the same click means something different — a public correction rather
+      // than a private choice — so it goes out as a different event. The screen does not decide
+      // whether that is allowed; the server does, and refuses anything else.
+      if (isRevealed) {
+        void runAction((socket) => editVote(socket, value)).then((ok) => {
+          if (ok) setEditingVote(false);
+        });
+        return;
+      }
+
       // Optimistic: the card lights up immediately and is corrected by `room:state` if the
       // server refuses it, which keeps a deliberately quick interaction quick.
       const previous = myVote;
@@ -208,8 +245,14 @@ export default function RoomPage() {
         if (!ok) setMyVote(previous);
       });
     },
-    [myVote, runAction],
+    [isRevealed, myVote, runAction],
   );
+
+  /** Issue #11: unlock the deck for this browser's own card, on a round already revealed. */
+  const onStartEditingVote = useCallback(() => {
+    setEditingVote(true);
+    setActionError(null);
+  }, []);
 
   const onReveal = useCallback(() => void runAction(revealRound), [runAction]);
   const onReset = useCallback(() => void runAction(resetRound), [runAction]);
@@ -282,11 +325,26 @@ export default function RoomPage() {
         </p>
       ) : null}
 
+      <RoomTable
+        participants={participants}
+        currentParticipantId={mySeatId}
+        connection={mySeatId ? connection : 'none'}
+        votedParticipantIds={votedIds}
+        revealedVotes={revealed?.votes ?? null}
+        myVote={myVote}
+        isRevealed={isRevealed}
+        onEditVote={mySeatId && myVote !== null ? onStartEditingVote : undefined}
+      />
+
       {mySeatId ? (
         <VoteDeck
           deckType={room.deckType}
           selected={myVote}
-          disabled={isRevealed}
+          // Locked once the cards are up — unless this browser asked to correct its own card,
+          // which is issue #11's edit. The deck is the picker either way, so there is no second
+          // card grid to keep in step with the first.
+          disabled={isRevealed && !editingVote}
+          editing={editingVote}
           onSelect={onSelectCard}
         />
       ) : null}
@@ -327,19 +385,12 @@ export default function RoomPage() {
         </div>
       ) : null}
 
-      <ParticipantList
-        participants={participants}
-        currentParticipantId={mySeatId}
-        connection={mySeatId ? connection : 'none'}
-        votedParticipantIds={votedIds}
-        revealedVotes={revealed?.votes ?? null}
-      />
-
       {revealed ? (
         <RoundResults
           participants={participants}
           votesByParticipant={revealed.votes}
           tally={revealed.tally}
+          deckType={room.deckType}
         />
       ) : null}
     </main>

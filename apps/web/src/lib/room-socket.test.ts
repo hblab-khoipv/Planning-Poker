@@ -122,15 +122,32 @@ describe('applyVoteCast', () => {
 });
 
 describe('votesByParticipant', () => {
-  it('indexes revealed votes so a row can look its own value up', () => {
+  it('indexes revealed votes so a seat can look its own card up', () => {
     const index = votesByParticipant([
-      { participantId: 'p1', value: '5' },
-      { participantId: 'p2', value: '8' },
+      { participantId: 'p1', value: '5', originalValue: null, editedAt: null },
+      { participantId: 'p2', value: '8', originalValue: null, editedAt: null },
     ]);
 
-    expect(index.get('p1')).toBe('5');
-    expect(index.get('p2')).toBe('8');
+    expect(index.get('p1')?.value).toBe('5');
+    expect(index.get('p2')?.value).toBe('8');
     expect(index.has('p3')).toBe(false);
+  });
+
+  it('keeps the card an edit replaced, so the screen can show the change (issue #11)', () => {
+    const index = votesByParticipant([
+      {
+        participantId: 'p1',
+        value: '3',
+        originalValue: '5',
+        editedAt: '2026-09-15T10:00:00.000Z',
+      },
+    ]);
+
+    expect(index.get('p1')).toMatchObject({
+      value: '3',
+      originalValue: '5',
+      editedAt: '2026-09-15T10:00:00.000Z',
+    });
   });
 
   it('is empty for a round nobody has revealed', () => {

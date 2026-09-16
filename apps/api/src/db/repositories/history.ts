@@ -133,6 +133,8 @@ interface VoteJson {
   participant_id: string;
   value: string;
   voted_at: string;
+  original_value: string | null;
+  edited_at: string | null;
 }
 
 /**
@@ -170,6 +172,12 @@ export async function listRoundsWithVotes(
     round: mapRound(row),
     // json_agg hands back ISO strings where a direct row read would give Date objects, so the
     // timestamps are rebuilt here and every consumer sees one `Vote` shape.
-    votes: (row.votes ?? []).map((vote) => mapVote({ ...vote, voted_at: new Date(vote.voted_at) })),
+    votes: (row.votes ?? []).map((vote) =>
+      mapVote({
+        ...vote,
+        voted_at: new Date(vote.voted_at),
+        edited_at: vote.edited_at ? new Date(vote.edited_at) : null,
+      }),
+    ),
   }));
 }

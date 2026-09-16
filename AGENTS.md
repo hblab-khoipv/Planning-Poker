@@ -89,6 +89,18 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 - `room_participants.is_online` is written by the socket layer on connect and on a grace-expired
   disconnect, so `GET /rooms/:code/participants` and the socket stream cannot disagree. A seat is
   never deleted on disconnect — it still holds a vote.
+- Changing a card after the reveal is a second, separate action (`vote:edit` → `vote:edited`,
+  issue #11) — never `vote:cast` aimed at a revealed round. Neither request carries a participant
+  id, so "only the owner may edit their own card" is the absence of a parameter rather than a
+  check; `votes.original_value`/`edited_at` (migration 0006) are the evidence, written with
+  `COALESCE(original_value, value)` so a second edit still points at the card the room first saw.
+  PRD FR-4 allows changing a vote only _before_ the reveal — see issue #19 for that delta.
+- The room screen is a table (`components/room-table.tsx`), and the two rules with edge cases live
+  apart from it as pure functions with unit tests: `lib/table-seats.ts` (who sits where, host in
+  the middle of the near edge) and `lib/vote-chart.ts` (the reveal distribution, issue #12).
+  The reveal chart is hand-drawn Tailwind on purpose — no charting library.
+- `apps/web`'s unit suite is `src/**/*.test.ts` in a _node_ environment: there is no React testing
+  library here, so logic worth asserting belongs in `src/lib/` rather than inside a component.
 - Session history (FR-9) is account-only and says so structurally: `db/repositories/history.ts`
   filters on `room_participants.user_id`, which no guest seat (NULL `user_id`) can match, and
   `GET /users/me/rooms` has no id in its path to tamper with. The pure predicate is

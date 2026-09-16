@@ -76,3 +76,16 @@ Nothing is reloaded between shots — every change is an event arriving on an op
 | `voting-07-consensus-minh.png`    | Round 2 reached consensus on 13: the “Đồng thuận” badge, with trung bình/median 13. Reached in round 2, so round 1's values provably cannot have fed this tally.            |
 | `voting-08-non-host-lan.png`      | A non-host in a `tshirt` room: the deck is the room's own (sizes, no numbers) and there is no reveal or reset control on the page at all.                                   |
 | `voting-09-tshirt-revealed.png`   | A t-shirt reveal: consensus works, and average/median are deliberately absent — FR-6 scopes them to numeric decks.                                                          |
+
+## Task 7 — the table UI and the reveal chart (issues #11, #12)
+
+One browser holding the host's seat plus four other seats voting over real sockets, against the
+real API and database. The last guest deliberately never plays a card, so the grey "chưa chọn"
+seat is in the picture too.
+
+| File                              | What it shows                                                                                                                                                                                         |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `table-01-voting.png`             | **Issue #11.** The room as a table, host facing it from the near edge. Three coloured cards ("đã chọn"), one grey card (still thinking) — and no value of anybody else's, because the round is open.  |
+| `table-02-revealed-chart.png`     | **Issues #11 + #12.** Cards face up around the table, and the result as a bar chart: one bar per card played, its count under it, with trung bình / median / số lượt vote beside it.                  |
+| `table-03-edited-own-card.png`    | **Issue #11's edit.** The host changed their own card after the reveal: "đã sửa" on the seat, `8 → 3` under it and struck through in the results, and the chart and the average recomputed around it. |
+| `table-04-edited-seen-by-lan.png` | The same moment from Lan's browser — she sees the host's change without a reload, and the only "Sửa bài" control on her screen is the one under her own seat.                                         |

@@ -59,6 +59,10 @@ export interface Vote {
   participantId: string;
   value: string;
   votedAt: Date;
+  /** The card the room saw at reveal time, once this vote has been edited since (issue #11). */
+  originalValue: string | null;
+  /** When the card was last changed after the reveal; null for a vote nobody has edited. */
+  editedAt: Date | null;
 }
 
 /** Raised when an argument is rejected before any SQL is sent. */

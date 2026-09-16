@@ -10,6 +10,10 @@ export const SOCKET_EVENTS = {
   PARTICIPANT_JOINED: 'participant:joined',
   PARTICIPANT_LEFT: 'participant:left',
   VOTE_CAST: 'vote:cast',
+  /** Client→server: changing one's own card on a round the room has already seen (issue #11). */
+  VOTE_EDIT: 'vote:edit',
+  /** Server→client: somebody's revealed card was replaced, with the old one still attached. */
+  VOTE_EDITED: 'vote:edited',
   /** Client→server: the host asking for the cards to be turned over. */
   ROUND_REVEAL: 'round:reveal',
   ROUND_REVEALED: 'round:revealed',
@@ -89,6 +93,25 @@ export interface RoundRevealedPayload {
 }
 
 /**
+ * Issue #11's edit-after-reveal, announced to the whole room.
+ *
+ * The cards are already public by the time this can fire — the round is `revealed` or the handler
+ * refuses — so unlike `vote:cast` this event may carry values. It carries *every* vote rather than
+ * only the changed one for the same reason `round:reset` carries the new round: a client applies
+ * it by replacing the round's votes and tally wholesale, so two edits arriving out of order
+ * cannot leave a screen showing one person's new card beside a stale average.
+ *
+ * `participantId` is who did the editing, so a client can point at the change without diffing
+ * two snapshots.
+ */
+export interface VoteEditedPayload {
+  participantId: string;
+  round: RoundDto;
+  votes: RevealedVoteDto[];
+  tally: RoundTally;
+}
+
+/**
  * PRD §8 `round:reset` — "round_id mới, status = voting".
  *
  * Carrying the new round rather than a bare "clear yourself" is what makes the event idempotent:
@@ -99,7 +122,15 @@ export interface RoundResetPayload {
   round: RoundDto;
 }
 
-/** What the client sends when somebody picks a card. The value is checked against the deck. */
+/**
+ * What the client sends when somebody picks a card. The value is checked against the deck.
+ *
+ * `vote:edit` reuses this shape deliberately: an edit is the same "here is my card" message, and
+ * *whose* card it is is settled by the handshake either way. There is no participant id a caller
+ * could put here, which is what makes "only the owner may edit their own vote" (issue #11)
+ * structural rather than a check the handler has to remember — see
+ * `apps/api/src/realtime/voting.ts`.
+ */
 export interface VoteCastRequest {
   value: string;
 }
@@ -115,6 +146,10 @@ export const VOTE_ERROR_CODES = {
   NOT_HOST: 'not_host',
   NO_ROUND: 'no_round',
   ROUND_NOT_OPEN: 'round_not_open',
+  /** An edit aimed at a round whose cards are still face down — that is a plain vote. */
+  ROUND_NOT_REVEALED: 'round_not_revealed',
+  /** There is no card of this person's to edit: they never voted in this round. */
+  NO_VOTE: 'no_vote',
   INVALID_CARD: 'invalid_card',
   INTERNAL: 'internal',
 } as const;
@@ -132,6 +167,7 @@ export interface ServerToClientEvents {
   [SOCKET_EVENTS.PARTICIPANT_JOINED]: (payload: ParticipantJoinedPayload) => void;
   [SOCKET_EVENTS.PARTICIPANT_LEFT]: (payload: ParticipantLeftPayload) => void;
   [SOCKET_EVENTS.VOTE_CAST]: (payload: VoteCastPayload) => void;
+  [SOCKET_EVENTS.VOTE_EDITED]: (payload: VoteEditedPayload) => void;
   [SOCKET_EVENTS.ROUND_REVEALED]: (payload: RoundRevealedPayload) => void;
   [SOCKET_EVENTS.ROUND_RESET]: (payload: RoundResetPayload) => void;
 }
@@ -143,10 +179,13 @@ export interface ServerToClientEvents {
  * literal: what a client sends is a card, what the server relays is the fact that a card was
  * sent. `round:reveal` and `round:reset` carry no payload at all — who is asking is settled by
  * the handshake, and which round it applies to is always the room's current one, so there is
- * nothing for a caller to get wrong or to forge.
+ * nothing for a caller to get wrong or to forge. `vote:edit` (issue #11) is the same message as
+ * `vote:cast` aimed at a round that is already revealed; it too names no participant, so it can
+ * only ever move the sender's own card.
  */
 export interface ClientToServerEvents {
   [SOCKET_EVENTS.VOTE_CAST]: (payload: VoteCastRequest, ack?: AckFn) => void;
+  [SOCKET_EVENTS.VOTE_EDIT]: (payload: VoteCastRequest, ack?: AckFn) => void;
   [SOCKET_EVENTS.ROUND_REVEAL]: (ack?: AckFn) => void;
   [SOCKET_EVENTS.ROUND_RESET]: (ack?: AckFn) => void;
 }

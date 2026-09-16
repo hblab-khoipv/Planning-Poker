@@ -9,6 +9,7 @@ import {
   SOCKET_EVENTS,
   VOTE_ERROR_CODES,
   type VoteCastPayload,
+  type VoteEditedPayload,
 } from '@planning-poker/shared';
 import type pg from 'pg';
 import request from 'supertest';
@@ -294,9 +295,10 @@ describe('voting, reveal and new rounds', () => {
         expect(payload.round.revealedAt).not.toBeNull();
         expect([...payload.votes].sort((a, b) => a.value.localeCompare(b.value))).toEqual(
           [
-            { participantId: host.id, value: '2' },
-            { participantId: minh.id, value: '8' },
-            { participantId: lan.id, value: '3' },
+            // Nobody has touched their card since the reveal, so no edit evidence rides along.
+            { participantId: host.id, value: '2', originalValue: null, editedAt: null },
+            { participantId: minh.id, value: '8', originalValue: null, editedAt: null },
+            { participantId: lan.id, value: '3', originalValue: null, editedAt: null },
           ].sort((a, b) => a.value.localeCompare(b.value)),
         );
         // (2 + 3 + 8) / 3 = 4.33, middle value 3.
@@ -411,6 +413,195 @@ describe('voting, reveal and new rounds', () => {
       const second = await findCurrentRound(db, room.id);
 
       expect(second!.revealedAt!.toISOString()).toBe(first!.revealedAt!.toISOString());
+    });
+  });
+
+  /**
+   * Issue #11's edit-after-reveal, through real sockets.
+   *
+   * The interesting assertions are about ownership and evidence: that a socket can only ever move
+   * its own card (there is no request shape that names another seat), and that when it does, the
+   * whole room is told both cards. Both are properties of the protocol rather than of the screen,
+   * which is why they are pinned here as well as in the unit tests.
+   */
+  describe('editing a vote after the reveal (issue #11)', () => {
+    /** A revealed round where the host played 2, Lan 5 and Minh 8. */
+    async function revealedRoom() {
+      const seated = await seatedRoom();
+      const { room, host, lan, minh } = seated;
+
+      const hostSocket = await open({ roomCode: room.code, participantId: host.id });
+      await nextEvent<RoomStatePayload>(hostSocket, SOCKET_EVENTS.ROOM_STATE);
+      const lanSocket = await open({ roomCode: room.code, participantId: lan.id });
+      await nextEvent<RoomStatePayload>(lanSocket, SOCKET_EVENTS.ROOM_STATE);
+      const minhSocket = await open({ roomCode: room.code, participantId: minh.id });
+      await nextEvent<RoomStatePayload>(minhSocket, SOCKET_EVENTS.ROOM_STATE);
+
+      await emit(hostSocket, SOCKET_EVENTS.VOTE_CAST, { value: '2' });
+      await emit(lanSocket, SOCKET_EVENTS.VOTE_CAST, { value: '5' });
+      await emit(minhSocket, SOCKET_EVENTS.VOTE_CAST, { value: '8' });
+      await emit(hostSocket, SOCKET_EVENTS.ROUND_REVEAL);
+
+      return { ...seated, hostSocket, lanSocket, minhSocket };
+    }
+
+    it('lets somebody change their own card and shows the room that they did', async () => {
+      const { room, lan, lanSocket, minhSocket } = await revealedRoom();
+
+      const seen = nextEvent<VoteEditedPayload>(minhSocket, SOCKET_EVENTS.VOTE_EDITED);
+      await expect(emit(lanSocket, SOCKET_EVENTS.VOTE_EDIT, { value: '3' })).resolves.toEqual({
+        ok: true,
+      });
+
+      const payload = await seen;
+      expect(payload.participantId).toBe(lan.id);
+
+      const edited = payload.votes.find((vote) => vote.participantId === lan.id);
+      // The evidence: the new card, the card the room first saw, and when it changed.
+      expect(edited).toMatchObject({ value: '3', originalValue: '5' });
+      expect(edited?.editedAt).toEqual(expect.any(String));
+
+      // Nobody else is marked as having edited anything.
+      expect(payload.votes.filter((vote) => vote.editedAt !== null)).toHaveLength(1);
+
+      // 2, 3, 8 — the numbers followed the cards.
+      expect(payload.tally).toMatchObject({ voteCount: 3, average: 4.33, median: 3 });
+
+      const round = await findCurrentRound(db, room.id);
+      const stored = await listVotesForRound(db, round!.id);
+      expect(stored.find((vote) => vote.participantId === lan.id)).toMatchObject({
+        value: '3',
+        originalValue: '5',
+      });
+    });
+
+    it('moves only the sender own card, even when the payload names another seat', async () => {
+      const { room, lan, minh, lanSocket } = await revealedRoom();
+
+      // The only identity the server uses is the handshake's, so this extra field is inert.
+      await expect(
+        emit(lanSocket, SOCKET_EVENTS.VOTE_EDIT, { value: '13', participantId: minh.id }),
+      ).resolves.toEqual({ ok: true });
+
+      const round = await findCurrentRound(db, room.id);
+      const stored = await listVotesForRound(db, round!.id);
+
+      expect(stored.find((vote) => vote.participantId === lan.id)).toMatchObject({
+        value: '13',
+        originalValue: '5',
+      });
+      // Minh still holds the card Minh played, unedited.
+      expect(stored.find((vote) => vote.participantId === minh.id)).toMatchObject({
+        value: '8',
+        originalValue: null,
+        editedAt: null,
+      });
+    });
+
+    it('keeps pointing at the card the room first saw across a second edit', async () => {
+      const { room, lan, lanSocket } = await revealedRoom();
+
+      await emit(lanSocket, SOCKET_EVENTS.VOTE_EDIT, { value: '3' });
+      await emit(lanSocket, SOCKET_EVENTS.VOTE_EDIT, { value: '13' });
+
+      const round = await findCurrentRound(db, room.id);
+      const stored = await listVotesForRound(db, round!.id);
+      expect(stored.find((vote) => vote.participantId === lan.id)).toMatchObject({
+        value: '13',
+        // Not '3': what the room agreed to compare against was 5.
+        originalValue: '5',
+      });
+    });
+
+    it('says nothing when somebody re-picks the card they already show', async () => {
+      const { room, lan, lanSocket, minhSocket } = await revealedRoom();
+
+      const leaked = vi.fn();
+      minhSocket.on(SOCKET_EVENTS.VOTE_EDITED, leaked);
+
+      await expect(emit(lanSocket, SOCKET_EVENTS.VOTE_EDIT, { value: '5' })).resolves.toEqual({
+        ok: true,
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      expect(leaked).not.toHaveBeenCalled();
+
+      // And the card is left exactly as it was — no "đã sửa" for a change that never happened.
+      const round = await findCurrentRound(db, room.id);
+      const stored = await listVotesForRound(db, round!.id);
+      expect(stored.find((vote) => vote.participantId === lan.id)).toMatchObject({
+        value: '5',
+        originalValue: null,
+        editedAt: null,
+      });
+    });
+
+    it('refuses an edit while the round is still being voted on', async () => {
+      const { room, lan } = await seatedRoom();
+
+      const lanSocket = await open({ roomCode: room.code, participantId: lan.id });
+      await nextEvent<RoomStatePayload>(lanSocket, SOCKET_EVENTS.ROOM_STATE);
+      await emit(lanSocket, SOCKET_EVENTS.VOTE_CAST, { value: '5' });
+
+      await expect(emit(lanSocket, SOCKET_EVENTS.VOTE_EDIT, { value: '8' })).resolves.toMatchObject(
+        { ok: false, code: VOTE_ERROR_CODES.ROUND_NOT_REVEALED },
+      );
+
+      const round = await findCurrentRound(db, room.id);
+      const stored = await listVotesForRound(db, round!.id);
+      // Nothing moved, and nothing was badged as edited.
+      expect(stored[0]).toMatchObject({ value: '5', originalValue: null, editedAt: null });
+    });
+
+    it('refuses somebody who never voted in the round', async () => {
+      const { room, host, minh } = await seatedRoom();
+
+      const hostSocket = await open({ roomCode: room.code, participantId: host.id });
+      await nextEvent<RoomStatePayload>(hostSocket, SOCKET_EVENTS.ROOM_STATE);
+      const minhSocket = await open({ roomCode: room.code, participantId: minh.id });
+      await nextEvent<RoomStatePayload>(minhSocket, SOCKET_EVENTS.ROOM_STATE);
+
+      await emit(hostSocket, SOCKET_EVENTS.VOTE_CAST, { value: '2' });
+      await emit(hostSocket, SOCKET_EVENTS.ROUND_REVEAL);
+
+      // Minh sat the round out, so there is no card of Minh's to move — and an edit is not a
+      // back door for voting after the cards are up.
+      await expect(
+        emit(minhSocket, SOCKET_EVENTS.VOTE_EDIT, { value: '8' }),
+      ).resolves.toMatchObject({ ok: false, code: VOTE_ERROR_CODES.NO_VOTE });
+
+      const round = await findCurrentRound(db, room.id);
+      expect(await listVotesForRound(db, round!.id)).toHaveLength(1);
+    });
+
+    it('refuses a card that is not in the room deck', async () => {
+      const { lanSocket } = await revealedRoom();
+
+      await expect(
+        emit(lanSocket, SOCKET_EVENTS.VOTE_EDIT, { value: 'XL' }),
+      ).resolves.toMatchObject({ ok: false, code: VOTE_ERROR_CODES.INVALID_CARD });
+    });
+
+    it('starts the next round with no edit history attached', async () => {
+      const { room, lan, host, hostSocket, lanSocket } = await revealedRoom();
+
+      await emit(lanSocket, SOCKET_EVENTS.VOTE_EDIT, { value: '3' });
+      await emit(hostSocket, SOCKET_EVENTS.ROUND_RESET);
+      await emit(lanSocket, SOCKET_EVENTS.VOTE_CAST, { value: '8' });
+
+      const round = await findCurrentRound(db, room.id);
+      expect(round).toMatchObject({ roundNumber: 2 });
+
+      const stored = await listVotesForRound(db, round!.id);
+      expect(stored).toEqual([
+        expect.objectContaining({
+          participantId: lan.id,
+          value: '8',
+          originalValue: null,
+          editedAt: null,
+        }),
+      ]);
+      expect(host.id).toBeTruthy();
     });
   });
 

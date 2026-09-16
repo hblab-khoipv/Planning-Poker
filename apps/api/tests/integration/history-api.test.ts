@@ -225,8 +225,8 @@ describe('session history API', () => {
       expect(typeof first.round.revealedAt).toBe('string');
       expect(first.votes).toEqual(
         expect.arrayContaining([
-          { participantId: memberSeatId, value: '3' },
-          { participantId: guestSeatId, value: '5' },
+          { participantId: memberSeatId, value: '3', originalValue: null, editedAt: null },
+          { participantId: guestSeatId, value: '5', originalValue: null, editedAt: null },
         ]),
       );
       // The same numbers task 6 computed when the host pressed "Lộ bài".

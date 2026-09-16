@@ -67,8 +67,21 @@ export function toRoundDto(round: VotingRound): RoundDto {
   };
 }
 
+/**
+ * A card, plus the evidence that it replaced an earlier one (issue #11).
+ *
+ * The edit fields ride on the same object as the value and are built in the same place, so a
+ * revealed payload cannot carry a card while dropping the fact that the room already saw a
+ * different one. Like the value itself, they only ever leave the server through
+ * `toRoundStateDto`, which refuses to emit any of it for a round that is not `revealed`.
+ */
 export function toRevealedVoteDto(vote: Vote): RevealedVoteDto {
-  return { participantId: vote.participantId, value: vote.value };
+  return {
+    participantId: vote.participantId,
+    value: vote.value,
+    originalValue: vote.originalValue,
+    editedAt: vote.editedAt?.toISOString() ?? null,
+  };
 }
 
 /**

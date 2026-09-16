@@ -8,6 +8,8 @@ interface VoteRow {
   participant_id: string;
   value: string;
   voted_at: Date;
+  original_value: string | null;
+  edited_at: Date | null;
 }
 
 export function mapVote(row: VoteRow): Vote {
@@ -17,10 +19,14 @@ export function mapVote(row: VoteRow): Vote {
     participantId: row.participant_id,
     value: row.value,
     votedAt: row.voted_at,
+    // Migration 0006 added these, so a row read by an older query (or a fixture that predates
+    // them) is normalised to "never edited" rather than to undefined.
+    originalValue: row.original_value ?? null,
+    editedAt: row.edited_at ?? null,
   };
 }
 
-const VOTE_COLUMNS = 'id, round_id, participant_id, value, voted_at';
+const VOTE_COLUMNS = 'id, round_id, participant_id, value, voted_at, original_value, edited_at';
 
 /**
  * A vote value is only meaningful relative to the room's deck: 'XL' is a real card in a
@@ -63,6 +69,41 @@ export async function castVote(db: Queryable, input: CastVoteInput): Promise<Vot
   );
 
   return mapVote(expectOne(rows, 'vote upsert returned no row'));
+}
+
+/**
+ * Replaces a card on a round the room has already seen, and records that it was replaced
+ * (issue #11).
+ *
+ * Separate from `castVote` rather than a flag on it, because the two are different events with
+ * different consequences: a pre-reveal change is invisible by design (FR-4), while this one is
+ * only allowed *because* it leaves evidence. Keeping them apart means no ordinary vote can
+ * accidentally stamp an edit, and no edit can be made silently.
+ *
+ * `original_value = COALESCE(original_value, value)` reads the row's old value, so a second edit
+ * keeps pointing at the card the room first compared against rather than at the intermediate one.
+ * The `value <> $3` guard makes re-picking the card you already show a no-op: it returns no row,
+ * and the caller treats that as "nothing changed" rather than badging somebody as having edited
+ * their vote to the same number.
+ *
+ * Whose vote this moves is decided entirely by `participantId`, which its socket caller takes
+ * from the handshake — see `apps/api/src/realtime/voting.ts`.
+ */
+export async function editRevealedVote(db: Queryable, input: CastVoteInput): Promise<Vote | null> {
+  const value = assertValidVoteValue(input.deckType, input.value);
+
+  const { rows } = await db.query<VoteRow>(
+    `UPDATE votes
+        SET value = $3,
+            original_value = COALESCE(original_value, value),
+            edited_at = now()
+      WHERE round_id = $1 AND participant_id = $2 AND value <> $3
+      RETURNING ${VOTE_COLUMNS}`,
+    [input.roundId, input.participantId, value],
+  );
+
+  const row = rows[0];
+  return row ? mapVote(row) : null;
 }
 
 /**
