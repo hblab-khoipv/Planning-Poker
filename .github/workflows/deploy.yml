@@ -106,6 +106,9 @@ jobs:
           CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
           API_PORT: ${{ vars.API_PORT }}
           SOCKET_DISCONNECT_GRACE_MS: ${{ vars.SOCKET_DISCONNECT_GRACE_MS }}
+          ROOM_IDLE_HOURS: ${{ vars.ROOM_IDLE_HOURS }}
+          ROOM_CLEANUP_INTERVAL_MS: ${{ vars.ROOM_CLEANUP_INTERVAL_MS }}
+          ROOM_CLEANUP_ENABLED: ${{ vars.ROOM_CLEANUP_ENABLED }}
         run: bash deploy/scripts/render-env.sh "${GITHUB_WORKSPACE}/.deploy-stage"
 
       - name: Deploy

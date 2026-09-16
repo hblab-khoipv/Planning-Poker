@@ -122,6 +122,9 @@ Google's authorized redirect URI must be `https://<domain>/api/auth/callback/goo
 | `CORS_ORIGIN`                | `REPLACE_ME`          | `https://<APP_DOMAIN>`. Comma-separated list the API accepts for REST and Socket.io.                                                                                                                     |
 | `API_PORT`                   | `4000`                | Loopback port for the API. Written into `api.env` as `PORT`, which is what `apps/api/src/config.ts` reads.                                                                                               |
 | `SOCKET_DISCONNECT_GRACE_MS` | `5000`                | How long a dropped socket keeps its seat online before it counts as leaving (PRD §12).                                                                                                                   |
+| `ROOM_IDLE_HOURS`            | `24`                  | How long a room may sit unused before the in-process sweep deletes it and everything in it (FR-10). Unset ⇒ 24h.                                                                                         |
+| `ROOM_CLEANUP_INTERVAL_MS`   | `300000`              | How often that sweep runs. Unset ⇒ 5 minutes.                                                                                                                                                            |
+| `ROOM_CLEANUP_ENABLED`       | `true`                | Set to `false` to run a box that never deletes rooms. Unset ⇒ enabled.                                                                                                                                   |
 | `DEPLOY_PATH`                | `/opt/planning-poker` | Release root on the box.                                                                                                                                                                                 |
 
 A worked example for `poker.example.com`:
