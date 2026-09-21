@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { JoinByCodeForm } from '@/components/join-by-code-form';
+import { SignInPrompt } from '@/components/sign-in-prompt';
 
 /**
  * PRD §9.3, step one: which room? The display name is asked for on `/join/[code]`, once we know
@@ -24,12 +25,7 @@ export default function JoinPage() {
           Tạo phòng mới
         </Link>
       </p>
-      <p className="text-sm text-slate-400">
-        Muốn lưu lịch sử phiên?{' '}
-        <Link href="/login" className="font-medium text-indigo-400 hover:underline">
-          Đăng nhập
-        </Link>
-      </p>
+      <SignInPrompt />
     </main>
   );
 }

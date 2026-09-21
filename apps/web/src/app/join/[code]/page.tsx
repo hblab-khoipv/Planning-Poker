@@ -12,6 +12,7 @@ import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { fetchRoom, joinRoom, messageForError } from '@/lib/api-client';
 import { browserIdentityStore, readGuestIdentity, saveGuestIdentity } from '@/lib/guest-identity';
+import { SignInPrompt } from '@/components/sign-in-prompt';
 import { readRoomMembership, saveRoomMembership } from '@/lib/room-membership';
 
 /**
@@ -181,14 +182,7 @@ export default function JoinRoomPage() {
         </button>
       </form>
 
-      {signedIn ? null : (
-        <p className="text-sm text-slate-400">
-          Muốn lưu lịch sử phiên?{' '}
-          <Link href="/login" className="font-medium text-indigo-400 hover:underline">
-            Đăng nhập
-          </Link>
-        </p>
-      )}
+      <SignInPrompt />
     </main>
   );
 }

@@ -117,8 +117,8 @@ export default function RoomHistoryPage() {
                 <h2 className="text-xl font-semibold">Round {entry.round.roundNumber}</h2>
                 <span className="text-xs text-slate-500" data-testid="round-revealed-at">
                   {entry.round.revealedAt
-                    ? `Lộ bài lúc ${formatTimestamp(entry.round.revealedAt)}`
-                    : 'Chưa lộ bài'}
+                    ? `Lật bài lúc ${formatTimestamp(entry.round.revealedAt)}`
+                    : 'Chưa lật bài'}
                 </span>
               </div>
 
@@ -131,7 +131,7 @@ export default function RoomHistoryPage() {
                 />
               ) : (
                 <p data-testid="round-not-revealed" className="text-sm text-slate-400">
-                  Round này kết thúc mà chưa lộ bài, nên các lá bài vẫn được giữ kín.
+                  Round này kết thúc mà chưa lật bài, nên các lá bài vẫn được giữ kín.
                 </p>
               )}
             </li>
