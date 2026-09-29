@@ -82,9 +82,8 @@ export interface RateLimitOptions {
  *
  * Sliding rather than fixed because a fixed window lets twice the budget through across its
  * boundary, and a double burst of flying tomatoes is precisely what this exists to stop. Each
- * key keeps only the timestamps still inside the window, so an idle room costs nothing, and a
- * key whose last throw has aged out is dropped entirely rather than leaking for the life of the
- * process.
+ * key keeps only the timestamps still inside the window; the key itself goes when `forget` is
+ * called on a seat's grace-expired disconnect.
  */
 export class ReactionRateLimiter {
   private readonly hits = new Map<string, number[]>();

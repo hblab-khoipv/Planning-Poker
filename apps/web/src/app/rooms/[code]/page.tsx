@@ -101,6 +101,7 @@ export default function RoomPage() {
    */
   const [reactions, setReactions] = useState<readonly LiveReaction[]>([]);
   const [reactionTarget, setReactionTarget] = useState<string | null>(null);
+  const [reactionError, setReactionError] = useState<string | null>(null);
 
   // Held in a ref rather than state: the handlers need the live socket, and re-rendering when it
   // changes would tear the room's event subscriptions down mid-round.
@@ -294,9 +295,17 @@ export default function RoomPage() {
     setActionError(null);
   }, []);
 
+  // Its own error state, not `runAction`'s: a throw must never clear or overwrite a vote,
+  // reveal or edit refusal, and a refused throw does not belong in the room's main alert.
   const onThrowReaction = useCallback(
-    (emoji: string) => void runAction((socket) => throwReaction(socket, emoji, reactionTarget)),
-    [reactionTarget, runAction],
+    (emoji: string) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      void throwReaction(socket, emoji, reactionTarget).then((ack) =>
+        setReactionError(messageForActionError(ack)),
+      );
+    },
+    [reactionTarget],
   );
 
   const onReveal = useCallback(() => void runAction(revealRound), [runAction]);
@@ -406,6 +415,11 @@ export default function RoomPage() {
           onThrow={onThrowReaction}
           disabled={connection !== 'live'}
         />
+      ) : null}
+      {mySeatId && reactionError ? (
+        <p role="alert" data-testid="reaction-error" className="text-xs text-rose-400">
+          {reactionError}
+        </p>
       ) : null}
 
       {/* FR-5/FR-7: host-only. The server refuses anybody else regardless, so hiding the
