@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { AuthStatus } from '@/components/auth-status';
+import { IdentitySection } from '@/components/identity-section';
 import { JoinByCodeForm } from '@/components/join-by-code-form';
 
 /** PRD §9.1: create a room, or join one you were sent the code for. */
@@ -50,31 +50,7 @@ export default function HomePage() {
         </section>
       </div>
 
-      <section aria-labelledby="identity-heading" className="space-y-3">
-        <h2 id="identity-heading" className="text-xl font-semibold">
-          Tài khoản
-        </h2>
-        <AuthStatus />
-        <div className="flex flex-wrap gap-3 text-sm">
-          <Link
-            href="/login"
-            data-testid="home-login-link"
-            className="rounded-lg border border-slate-700 px-4 py-2 font-semibold text-slate-100 hover:bg-slate-800"
-          >
-            Đăng nhập / Đăng ký
-          </Link>
-          <Link
-            href="/join"
-            data-testid="home-guest-link"
-            className="rounded-lg border border-slate-700 px-4 py-2 font-semibold text-slate-100 hover:bg-slate-800"
-          >
-            Vào phòng với tư cách khách
-          </Link>
-        </div>
-        <p className="text-sm text-slate-400">
-          Đăng nhập chỉ để lưu lịch sử phiên — tạo và vào phòng không bắt buộc phải có tài khoản.
-        </p>
-      </section>
+      <IdentitySection />
     </main>
   );
 }

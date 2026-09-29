@@ -99,6 +99,14 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   apart from it as pure functions with unit tests: `lib/table-seats.ts` (who sits where, host in
   the middle of the near edge) and `lib/vote-chart.ts` (the reveal distribution, issue #12).
   The reveal chart is hand-drawn Tailwind on purpose — no charting library.
+- Whether a screen may offer sign-in, sign-up or guest identity is decided in one place,
+  `apps/web/src/lib/identity-cta.ts`, and nowhere else: `useSession()`'s three statuses map onto
+  `loading | signed-in | guest`, and only `guest` may be offered any of them. `loading` is its own
+  state on purpose — treating it as signed-out flashes a sign-in button at somebody who is signed
+  in, which is the bug the module exists to prevent (issue #23). The consumers are
+  `components/identity-section.tsx` (home), `components/sign-in-prompt.tsx` (the join screens) and
+  `components/already-signed-in.tsx` (what `/login` and `/register` show instead of their form).
+  Signing in stays optional (PRD §3.1.1) — this changes presentation only.
 - `apps/web`'s unit suite is `src/**/*.test.ts` in a _node_ environment: there is no React testing
   library here, so logic worth asserting belongs in `src/lib/` rather than inside a component.
 - Session history (FR-9) is account-only and says so structurally: `db/repositories/history.ts`
