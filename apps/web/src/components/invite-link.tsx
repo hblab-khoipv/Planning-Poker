@@ -3,7 +3,8 @@
 import { roomPath } from '@planning-poker/shared';
 import { useEffect, useState } from 'react';
 
-/** PRD §4 step 3: the host copies this and pastes it into Slack/Teams. */
+/** PRD §4 step 3: the host copies this and pastes it into Slack/Teams.
+ * Compact by design — it lives in the room screen's single header row. */
 export function InviteLink({ code }: { code: string }) {
   const [url, setUrl] = useState('');
   const [copied, setCopied] = useState(false);
@@ -24,30 +25,25 @@ export function InviteLink({ code }: { code: string }) {
   }
 
   return (
-    <section aria-labelledby="invite-heading" className="space-y-2">
-      <h2
-        id="invite-heading"
-        className="text-sm font-semibold uppercase tracking-wide text-slate-400"
-      >
+    <section aria-labelledby="invite-heading" className="flex min-w-0 items-center gap-2">
+      <h2 id="invite-heading" className="sr-only">
         Link mời
       </h2>
-      <div className="flex flex-wrap gap-2">
-        <input
-          readOnly
-          value={url}
-          aria-label="Link mời vào phòng"
-          data-testid="invite-link"
-          className="w-full min-w-0 flex-1 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 font-mono text-sm text-slate-300"
-        />
-        <button
-          type="button"
-          onClick={() => void copy()}
-          data-testid="invite-copy"
-          className="shrink-0 rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-800"
-        >
-          {copied ? 'Đã copy' : 'Copy'}
-        </button>
-      </div>
+      <input
+        readOnly
+        value={url}
+        aria-label="Link mời vào phòng"
+        data-testid="invite-link"
+        className="min-w-0 flex-1 rounded-lg border border-line bg-surface-2 px-2 py-1 font-mono text-xs text-ink-muted"
+      />
+      <button
+        type="button"
+        onClick={() => void copy()}
+        data-testid="invite-copy"
+        className="shrink-0 rounded-lg border border-line-strong px-3 py-1 text-xs font-semibold text-ink hover:bg-surface-2"
+      >
+        {copied ? 'Đã copy' : 'Copy'}
+      </button>
     </section>
   );
 }

@@ -315,10 +315,10 @@ export default function RoomPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">Không mở được phòng</h1>
-        <p role="alert" data-testid="room-error" className="text-sm text-rose-400">
+        <p role="alert" data-testid="room-error" className="text-sm text-danger-ink">
           {error}
         </p>
-        <Link href="/join" className="text-sm font-medium text-indigo-400 hover:underline">
+        <Link href="/join" className="text-sm font-medium text-brand-ink hover:underline">
           ← Nhập lại mã phòng
         </Link>
       </main>
@@ -328,7 +328,7 @@ export default function RoomPage() {
   if (!room || !code) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl items-center justify-center px-6 py-16">
-        <p className="text-sm text-slate-400" data-testid="room-loading">
+        <p className="text-sm text-ink-muted" data-testid="room-loading">
           Đang tải phòng…
         </p>
       </main>
@@ -336,35 +336,49 @@ export default function RoomPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-12">
-      <header className="space-y-2">
-        <p className="text-sm uppercase tracking-widest text-indigo-400">Phòng estimate</p>
-        <h1 data-testid="room-name" className="text-3xl font-bold tracking-tight">
+    /**
+     * One screen, no page scroll from `lg` up (1366×768 and 1440×900 both qualify): a fixed
+     * header row, a middle that is the only thing allowed to grow, and the deck pinned at the
+     * bottom where a voter's hand belongs. Below `lg` the same markup falls back to ordinary
+     * document flow and scrolls, which is what keeps it usable on a phone.
+     */
+    <main
+      data-testid="room-screen"
+      className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-3 py-3 lg:h-[100dvh] lg:overflow-hidden"
+    >
+      <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
+        <h1 data-testid="room-name" className="text-lg font-bold tracking-tight">
           {room.name}
         </h1>
-        <p className="text-sm text-slate-400">
-          Mã phòng:{' '}
-          <span data-testid="room-code" className="font-mono">
+        <p className="text-xs text-ink-muted">
+          Mã:{' '}
+          <span data-testid="room-code" className="font-mono font-semibold text-ink">
             {room.code}
           </span>{' '}
           · Bộ thẻ: <span data-testid="room-deck-type">{room.deckType}</span>
+          {round ? (
+            <>
+              {' '}
+              · Round <span data-testid="round-number">{round.roundNumber}</span> ·{' '}
+              <span
+                data-testid="round-status"
+                data-state={round.status}
+                className="font-semibold text-ink"
+              >
+                {isRevealed ? 'Đã lật bài' : 'Đang vote'}
+              </span>
+            </>
+          ) : null}
         </p>
-        {round ? (
-          <p className="text-sm text-slate-400">
-            Round <span data-testid="round-number">{round.roundNumber}</span> ·{' '}
-            <span data-testid="round-status" data-state={round.status}>
-              {isRevealed ? 'Đã lật bài' : 'Đang vote'}
-            </span>
-          </p>
-        ) : null}
+        <div className="ml-auto flex min-w-0 max-w-xs flex-1 basis-64 items-center">
+          <InviteLink code={room.code} />
+        </div>
       </header>
-
-      <InviteLink code={room.code} />
 
       {mySeatId ? null : (
         <p
           data-testid="room-not-joined"
-          className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+          className="shrink-0 rounded-lg border border-warn/40 bg-warn/10 px-3 py-1.5 text-xs text-warn-ink"
         >
           Bạn đang xem phòng này mà chưa tham gia.{' '}
           <Link href={joinPath(room.code)} className="font-semibold underline">
@@ -374,98 +388,114 @@ export default function RoomPage() {
       )}
 
       {actionError ? (
-        <p role="alert" data-testid="action-error" className="text-sm text-rose-400">
+        <p
+          role="alert"
+          data-testid="action-error"
+          className="shrink-0 text-xs font-medium text-danger-ink"
+        >
           {actionError}
         </p>
       ) : null}
 
-      <RoomTable
-        participants={participants}
-        currentParticipantId={mySeatId}
-        connection={mySeatId ? connection : 'none'}
-        votedParticipantIds={votedIds}
-        revealedVotes={revealed?.votes ?? null}
-        myVote={myVote}
-        isRevealed={isRevealed}
-        reactions={reactions as LiveReaction[]}
-        onEditVote={mySeatId && myVote !== null ? onStartEditingVote : undefined}
-      />
-
-      {mySeatId ? (
-        <VoteDeck
-          deckType={room.deckType}
-          selected={myVote}
-          // Locked once the cards are up — unless this browser asked to correct its own card,
-          // which is issue #11's edit. The deck is the picker either way, so there is no second
-          // card grid to keep in step with the first.
-          disabled={isRevealed && !editingVote}
-          editing={editingVote}
-          onSelect={onSelectCard}
-        />
-      ) : null}
-
-      {/* Reactions work in every round state, so this is outside the deck's revealed/editing
-          branching entirely — the one thing in the room that is never locked. */}
-      {mySeatId ? (
-        <ReactionBar
-          participants={participants}
-          currentParticipantId={mySeatId}
-          targetParticipantId={reactionTarget}
-          onChangeTarget={setReactionTarget}
-          onThrow={onThrowReaction}
-          disabled={connection !== 'live'}
-        />
-      ) : null}
-      {mySeatId && reactionError ? (
-        <p role="alert" data-testid="reaction-error" className="text-xs text-rose-400">
-          {reactionError}
-        </p>
-      ) : null}
-
-      {/* FR-5/FR-7: host-only. The server refuses anybody else regardless, so hiding the
-          buttons is an affordance rather than the security boundary. */}
-      {isHost ? (
-        <div className="flex flex-wrap gap-3" data-testid="host-controls">
-          {isRevealed ? (
-            <>
-              <button
-                type="button"
-                data-testid="revote-button"
-                onClick={onReset}
-                className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-indigo-500"
-              >
-                Vote lại
-              </button>
-              <button
-                type="button"
-                data-testid="new-round-button"
-                onClick={onReset}
-                className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-400"
-              >
-                Task tiếp theo / Round mới
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              data-testid="reveal-button"
-              onClick={onReveal}
-              className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-400"
-            >
-              Lật bài
-            </button>
-          )}
+      {/* The table gets every pixel left over; the results rail sits beside it once there are
+          results, so revealing a round never pushes the deck off the bottom of the screen. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <RoomTable
+            participants={participants}
+            currentParticipantId={mySeatId}
+            connection={mySeatId ? connection : 'none'}
+            votedParticipantIds={votedIds}
+            revealedVotes={revealed?.votes ?? null}
+            myVote={myVote}
+            isRevealed={isRevealed}
+            reactions={reactions as LiveReaction[]}
+            onEditVote={mySeatId && myVote !== null ? onStartEditingVote : undefined}
+          />
         </div>
-      ) : null}
 
-      {revealed ? (
-        <RoundResults
-          participants={participants}
-          votesByParticipant={revealed.votes}
-          tally={revealed.tally}
-          deckType={room.deckType}
-        />
-      ) : null}
+        {revealed ? (
+          <aside className="min-h-0 w-full shrink-0 overflow-y-auto lg:w-[22rem]">
+            <RoundResults
+              participants={participants}
+              votesByParticipant={revealed.votes}
+              tally={revealed.tally}
+              deckType={room.deckType}
+            />
+          </aside>
+        ) : null}
+      </div>
+
+      <footer className="flex shrink-0 flex-wrap items-end justify-between gap-3 border-t border-line pt-2">
+        {mySeatId ? (
+          <VoteDeck
+            deckType={room.deckType}
+            selected={myVote}
+            // Locked once the cards are up — unless this browser asked to correct its own card,
+            // which is issue #11's edit. The deck is the picker either way, so there is no second
+            // card grid to keep in step with the first.
+            disabled={isRevealed && !editingVote}
+            editing={editingVote}
+            onSelect={onSelectCard}
+          />
+        ) : (
+          <span />
+        )}
+
+        {/* Reactions work in every round state, so this sits outside the deck's
+            revealed/editing branching — the one thing in the room that is never locked. */}
+        {mySeatId ? (
+          <ReactionBar
+            participants={participants}
+            currentParticipantId={mySeatId}
+            targetParticipantId={reactionTarget}
+            onChangeTarget={setReactionTarget}
+            onThrow={onThrowReaction}
+            disabled={connection !== 'live'}
+          />
+        ) : null}
+        {mySeatId && reactionError ? (
+          <p role="alert" data-testid="reaction-error" className="text-xs text-danger-ink">
+            {reactionError}
+          </p>
+        ) : null}
+
+        {/* FR-5/FR-7: host-only. The server refuses anybody else regardless, so hiding the
+            buttons is an affordance rather than the security boundary. */}
+        {isHost ? (
+          <div className="flex flex-wrap gap-2" data-testid="host-controls">
+            {isRevealed ? (
+              <>
+                <button
+                  type="button"
+                  data-testid="revote-button"
+                  onClick={onReset}
+                  className="rounded-lg border border-line-strong px-3 py-2 text-sm font-semibold text-ink hover:border-brand"
+                >
+                  Vote lại
+                </button>
+                <button
+                  type="button"
+                  data-testid="new-round-button"
+                  onClick={onReset}
+                  className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-on-brand hover:bg-brand-strong"
+                >
+                  Task tiếp theo / Round mới
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                data-testid="reveal-button"
+                onClick={onReveal}
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-on-brand hover:bg-brand-strong"
+              >
+                Lật bài
+              </button>
+            )}
+          </div>
+        ) : null}
+      </footer>
     </main>
   );
 }

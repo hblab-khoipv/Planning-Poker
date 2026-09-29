@@ -18,7 +18,7 @@ export function AuthStatus() {
 
   if (!session?.user) {
     return (
-      <p className="text-sm text-slate-400" data-testid="auth-status">
+      <p className="text-sm text-ink-muted" data-testid="auth-status">
         Chưa đăng nhập.
       </p>
     );
@@ -26,21 +26,21 @@ export function AuthStatus() {
 
   return (
     <div className="flex flex-wrap items-center gap-3 text-sm" data-testid="auth-status">
-      <span className="text-slate-300">
+      <span className="text-ink-muted">
         Đã đăng nhập:{' '}
-        <strong className="text-slate-100">{session.user.name ?? session.user.email}</strong>
+        <strong className="text-ink">{session.user.name ?? session.user.email}</strong>
       </span>
       <Link
         href={historyPath()}
         data-testid="history-link"
-        className="rounded border border-slate-700 px-3 py-1 font-medium text-slate-200 hover:bg-slate-800"
+        className="rounded border border-line-strong px-3 py-1 font-medium text-ink hover:bg-surface-2"
       >
         Lịch sử phiên
       </Link>
       <button
         type="button"
         onClick={() => void signOut({ callbackUrl: '/' })}
-        className="rounded border border-slate-700 px-3 py-1 font-medium text-slate-200 hover:bg-slate-800"
+        className="rounded border border-line-strong px-3 py-1 font-medium text-ink hover:bg-surface-2"
       >
         Đăng xuất
       </button>

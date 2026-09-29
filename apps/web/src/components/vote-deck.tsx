@@ -34,12 +34,12 @@ export function VoteDeck({
   onSelect: (value: string) => void;
 }) {
   return (
-    <section aria-labelledby="deck-heading" className="space-y-3">
-      <h2 id="deck-heading" className="text-xl font-semibold">
+    <section aria-labelledby="deck-heading" className="space-y-2">
+      <h2 id="deck-heading" className="text-sm font-semibold">
         {editing ? 'Chọn thẻ mới — cả phòng sẽ thấy bạn đã sửa' : 'Chọn thẻ của bạn'}
       </h2>
 
-      <ul data-testid="vote-deck" className="flex flex-wrap gap-2">
+      <ul data-testid="vote-deck" className="flex flex-wrap gap-1.5">
         {DECKS[deckType].map((value) => {
           const isSelected = value === selected;
           return (
@@ -52,11 +52,11 @@ export function VoteDeck({
                 aria-pressed={isSelected}
                 disabled={disabled}
                 onClick={() => onSelect(value)}
-                className={`h-20 w-14 rounded-lg border text-lg font-semibold transition ${
+                className={`h-12 w-9 rounded-lg border text-base font-semibold transition lg:h-14 lg:w-11 lg:text-lg ${
                   isSelected
-                    ? 'border-indigo-400 bg-indigo-500/20 text-indigo-200 ring-2 ring-indigo-400'
-                    : 'border-slate-700 bg-slate-900 text-slate-100 hover:border-indigo-500'
-                } ${editing ? 'ring-1 ring-amber-400/60' : ''} disabled:cursor-not-allowed disabled:opacity-40`}
+                    ? 'border-brand bg-brand text-on-brand shadow-md shadow-brand/30 ring-2 ring-brand ring-offset-2 ring-offset-surface'
+                    : 'border-line-strong bg-surface text-ink hover:border-brand hover:bg-brand/5'
+                } ${editing ? 'ring-1 ring-warn/60' : ''} disabled:cursor-not-allowed disabled:opacity-40`}
               >
                 {value}
               </button>
@@ -66,14 +66,14 @@ export function VoteDeck({
       </ul>
 
       {disabled ? (
-        <p className="text-sm text-slate-400" data-testid="deck-locked">
+        <p className="text-xs text-ink-muted" data-testid="deck-locked">
           Round đã lật bài. Bấm “Sửa bài” trên lá bài của bạn nếu muốn đổi, hoặc chờ host mở round
           mới.
         </p>
       ) : null}
 
       {editing ? (
-        <p className="text-sm text-amber-300" data-testid="deck-editing">
+        <p className="text-xs text-warn-ink" data-testid="deck-editing">
           Bạn đang sửa lá bài đã lật — thẻ mới sẽ được đánh dấu “đã sửa” cho cả phòng thấy.
         </p>
       ) : null}

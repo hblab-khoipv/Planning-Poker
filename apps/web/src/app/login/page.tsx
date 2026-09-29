@@ -52,7 +52,7 @@ function LoginForm() {
       <header className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Đăng nhập</h1>
         {state === 'guest' ? (
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-ink-muted">
             Đăng nhập để lưu lịch sử phiên. Không bắt buộc — bạn vẫn có thể vào phòng với tư cách
             khách.
           </p>
@@ -64,7 +64,7 @@ function LoginForm() {
       ) : state === 'loading' ? (
         /* Deliberate: a one-line placeholder rather than the form, so the sign-in form is never
            shown for a frame to somebody who turns out to be signed in. */
-        <p data-testid="login-loading" className="text-sm text-slate-400">
+        <p data-testid="login-loading" className="text-sm text-ink-muted">
           Đang kiểm tra phiên đăng nhập…
         </p>
       ) : (
@@ -84,7 +84,7 @@ function LoginForm() {
                 required
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
+                className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-ink outline-none focus:border-brand"
               />
             </div>
 
@@ -100,12 +100,12 @@ function LoginForm() {
                 required
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
+                className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-ink outline-none focus:border-brand"
               />
             </div>
 
             {message ? (
-              <p role="alert" data-testid="login-error" className="text-sm text-rose-400">
+              <p role="alert" data-testid="login-error" className="text-sm text-danger-ink">
                 {message}
               </p>
             ) : null}
@@ -113,34 +113,34 @@ function LoginForm() {
             <button
               type="submit"
               disabled={pending}
-              className="w-full rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white hover:bg-indigo-400 disabled:opacity-60"
+              className="w-full rounded-lg bg-brand px-4 py-2 font-semibold text-on-brand hover:bg-brand-strong disabled:opacity-60"
             >
               {pending ? 'Đang đăng nhập…' : 'Đăng nhập'}
             </button>
           </form>
 
-          <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-slate-500">
-            <span className="h-px flex-1 bg-slate-800" />
+          <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-ink-subtle">
+            <span className="h-px flex-1 bg-surface-2" />
             hoặc
-            <span className="h-px flex-1 bg-slate-800" />
+            <span className="h-px flex-1 bg-surface-2" />
           </div>
 
           <button
             type="button"
             data-testid="google-signin"
             onClick={() => void signIn('google', { callbackUrl: '/' })}
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 font-semibold text-slate-100 hover:bg-slate-800"
+            className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 font-semibold text-ink hover:bg-surface-2"
           >
             Đăng nhập với Google
           </button>
 
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-ink-muted">
             Chưa có tài khoản?{' '}
-            <Link href="/register" className="font-medium text-indigo-400 hover:underline">
+            <Link href="/register" className="font-medium text-brand-ink hover:underline">
               Đăng ký
             </Link>{' '}
             ·{' '}
-            <Link href="/join" className="font-medium text-indigo-400 hover:underline">
+            <Link href="/join" className="font-medium text-brand-ink hover:underline">
               Vào phòng với tư cách khách
             </Link>
           </p>

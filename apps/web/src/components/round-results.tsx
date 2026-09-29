@@ -37,21 +37,21 @@ export function RoundResults({
   const bars = voteChartBars(deckType, [...votesByParticipant.values()], names);
 
   return (
-    <section aria-labelledby="results-heading" className="space-y-4" data-testid="round-results">
-      <h2 id="results-heading" className="text-xl font-semibold">
+    <section aria-labelledby="results-heading" className="space-y-2" data-testid="round-results">
+      <h2 id="results-heading" className="text-base font-semibold">
         Kết quả
       </h2>
 
       {tally.consensus ? (
         <p
           data-testid="results-consensus"
-          className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-300"
+          className="rounded-lg border border-ok/40 bg-ok/10 px-3 py-2 text-xs font-semibold text-ok-ink"
         >
           🎉 Đồng thuận — cả phòng cùng chọn {votesByParticipant.get(voters[0]?.id ?? '')?.value}
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-stretch gap-6 rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+      <div className="flex flex-wrap items-stretch gap-4 rounded-xl border border-line bg-surface p-3">
         {/* The picture. `role="img"` with the whole distribution as its label is what makes it
             readable without sight; the bars themselves are decorative repetitions of the labels
             printed underneath each one. */}
@@ -59,7 +59,7 @@ export function RoundResults({
           data-testid="results-chart"
           role="img"
           aria-label={`Phân bố vote — ${describeChart(bars)}`}
-          className="flex min-w-0 flex-1 items-end justify-center gap-4 overflow-x-auto pb-1"
+          className="flex min-w-0 flex-1 items-end justify-center gap-3 overflow-x-auto pb-1"
         >
           {bars.map((bar) => (
             <div
@@ -68,20 +68,20 @@ export function RoundResults({
               data-value={bar.value}
               data-count={bar.count}
               title={bar.voters.join(', ')}
-              className="flex w-14 shrink-0 flex-col items-center gap-2"
+              className="flex w-10 shrink-0 flex-col items-center gap-1"
             >
-              <div className="flex h-28 w-8 items-end" aria-hidden="true">
+              <div className="flex h-16 w-6 items-end" aria-hidden="true">
                 <div
                   className={`w-full rounded-full transition-all ${
-                    bar.isMode ? 'bg-indigo-400' : 'bg-slate-600'
+                    bar.isMode ? 'bg-brand' : 'bg-line-strong'
                   }`}
                   // The one inline style in the component: a bar's height is data, not design,
                   // and Tailwind has no class for "43% of the tallest bar".
                   style={{ height: `${Math.max(6, Math.round(bar.ratio * 100))}%` }}
                 />
               </div>
-              <span className="font-mono text-lg font-bold text-slate-100">{bar.value}</span>
-              <span className="text-xs text-slate-400">{bar.count} vote</span>
+              <span className="font-mono text-base font-bold text-ink">{bar.value}</span>
+              <span className="text-[11px] text-ink-muted">{bar.count} vote</span>
             </div>
           ))}
         </div>
@@ -89,30 +89,30 @@ export function RoundResults({
         {/* FR-6's numbers, kept beside the chart rather than under it: the reference design in
             issue #12 reads "biểu đồ, rồi con số" left to right. */}
         {tally.average === null ? (
-          <dl className="flex shrink-0 flex-col justify-center gap-3" data-testid="results-counts">
+          <dl className="flex shrink-0 flex-col justify-center gap-2" data-testid="results-counts">
             <div>
-              <dt className="text-xs uppercase tracking-widest text-slate-400">Số lượt vote</dt>
-              <dd className="text-3xl font-bold text-slate-100">{tally.voteCount}</dd>
+              <dt className="text-xs uppercase tracking-widest text-ink-muted">Số lượt vote</dt>
+              <dd className="text-2xl font-bold text-ink">{tally.voteCount}</dd>
             </div>
           </dl>
         ) : (
-          <dl className="flex shrink-0 flex-col justify-center gap-3" data-testid="results-summary">
+          <dl className="flex shrink-0 flex-col justify-center gap-2" data-testid="results-summary">
             <div>
-              <dt className="text-xs uppercase tracking-widest text-slate-400">Trung bình</dt>
-              <dd data-testid="results-average" className="text-3xl font-bold text-indigo-300">
+              <dt className="text-xs uppercase tracking-widest text-ink-muted">Trung bình</dt>
+              <dd data-testid="results-average" className="text-2xl font-bold text-brand-ink">
                 {tally.average}
               </dd>
             </div>
-            <div className="flex gap-6">
+            <div className="flex gap-4">
               <div>
-                <dt className="text-xs uppercase tracking-widest text-slate-400">Median</dt>
-                <dd data-testid="results-median" className="text-xl font-bold text-slate-100">
+                <dt className="text-xs uppercase tracking-widest text-ink-muted">Median</dt>
+                <dd data-testid="results-median" className="text-xl font-bold text-ink">
                   {tally.median}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-widest text-slate-400">Số lượt vote</dt>
-                <dd data-testid="results-vote-count" className="text-xl font-bold text-slate-100">
+                <dt className="text-xs uppercase tracking-widest text-ink-muted">Số lượt vote</dt>
+                <dd data-testid="results-vote-count" className="text-xl font-bold text-ink">
                   {tally.voteCount}
                 </dd>
               </div>
@@ -124,7 +124,7 @@ export function RoundResults({
       {/* FR-6's "bảng vote theo tên". Compact now that the chart carries the shape of the result,
           and carrying issue #11's edit evidence so a changed card is as visible here as it is on
           the table. */}
-      <ul className="flex flex-wrap gap-2" data-testid="results-list">
+      <ul className="flex flex-wrap gap-1.5" data-testid="results-list">
         {voters.map((participant) => {
           const vote = votesByParticipant.get(participant.id) as RevealedVoteDto;
           return (
@@ -133,32 +133,32 @@ export function RoundResults({
               data-testid="result-row"
               data-participant-id={participant.id}
               data-edited={vote.editedAt ? 'true' : 'false'}
-              className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2"
+              className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2 py-1"
             >
-              <span className="text-sm font-medium text-slate-100">{participant.displayName}</span>
+              <span className="text-xs font-medium text-ink">{participant.displayName}</span>
               {vote.editedAt ? (
                 <>
                   <span
                     data-testid="result-original-value"
-                    className="font-mono text-sm text-slate-500 line-through"
+                    className="font-mono text-sm text-ink-subtle line-through"
                   >
                     {vote.originalValue}
                   </span>
-                  <span aria-hidden="true" className="text-slate-500">
+                  <span aria-hidden="true" className="text-ink-subtle">
                     →
                   </span>
                 </>
               ) : null}
               <span
                 data-testid="result-value"
-                className="rounded bg-indigo-500/20 px-2 py-0.5 font-mono text-base font-bold text-indigo-200"
+                className="rounded bg-brand/10 px-1.5 py-0.5 font-mono text-sm font-bold text-brand-ink"
               >
                 {vote.value}
               </span>
               {vote.editedAt ? (
                 <span
                   data-testid="result-edited"
-                  className="rounded bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300"
+                  className="rounded bg-warn/15 px-1.5 py-0.5 text-[10px] font-semibold text-warn-ink"
                 >
                   đã sửa
                 </span>
@@ -169,7 +169,7 @@ export function RoundResults({
       </ul>
 
       {abstained.length === 0 ? null : (
-        <p className="text-sm text-slate-500" data-testid="results-abstained">
+        <p className="text-xs text-ink-subtle" data-testid="results-abstained">
           Chưa vote: {abstained.map((participant) => participant.displayName).join(', ')}
         </p>
       )}

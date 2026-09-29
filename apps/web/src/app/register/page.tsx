@@ -67,7 +67,7 @@ export default function RegisterPage() {
       <header className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Đăng ký</h1>
         {state === 'guest' ? (
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-ink-muted">
             Tài khoản dùng để lưu lịch sử các phiên estimate.
           </p>
         ) : null}
@@ -77,7 +77,7 @@ export default function RegisterPage() {
         <AlreadySignedIn heading="Bạn đã có tài khoản và đang đăng nhập" />
       ) : state === 'loading' ? (
         /* Deliberate: a one-line placeholder rather than the form — see the login screen. */
-        <p data-testid="register-loading" className="text-sm text-slate-400">
+        <p data-testid="register-loading" className="text-sm text-ink-muted">
           Đang kiểm tra phiên đăng nhập…
         </p>
       ) : (
@@ -94,7 +94,7 @@ export default function RegisterPage() {
                 autoComplete="name"
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
+                className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-ink outline-none focus:border-brand"
               />
             </div>
 
@@ -110,7 +110,7 @@ export default function RegisterPage() {
                 required
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
+                className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-ink outline-none focus:border-brand"
               />
             </div>
 
@@ -126,16 +126,16 @@ export default function RegisterPage() {
                 required
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
+                className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-ink outline-none focus:border-brand"
               />
-              <p className="text-xs text-slate-500">Tối thiểu {MIN_PASSWORD_LENGTH} ký tự.</p>
+              <p className="text-xs text-ink-subtle">Tối thiểu {MIN_PASSWORD_LENGTH} ký tự.</p>
             </div>
 
             {errors.length > 0 ? (
               <ul
                 role="alert"
                 data-testid="register-errors"
-                className="space-y-1 text-sm text-rose-400"
+                className="space-y-1 text-sm text-danger-ink"
               >
                 {errors.map((message) => (
                   <li key={message}>{message}</li>
@@ -146,7 +146,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={pending}
-              className="w-full rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white hover:bg-indigo-400 disabled:opacity-60"
+              className="w-full rounded-lg bg-brand px-4 py-2 font-semibold text-on-brand hover:bg-brand-strong disabled:opacity-60"
             >
               {pending ? 'Đang tạo tài khoản…' : 'Tạo tài khoản'}
             </button>
@@ -156,14 +156,14 @@ export default function RegisterPage() {
             type="button"
             data-testid="google-signin"
             onClick={() => void signIn('google', { callbackUrl: '/' })}
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 font-semibold text-slate-100 hover:bg-slate-800"
+            className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 font-semibold text-ink hover:bg-surface-2"
           >
             Đăng ký với Google
           </button>
 
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-ink-muted">
             Đã có tài khoản?{' '}
-            <Link href="/login" className="font-medium text-indigo-400 hover:underline">
+            <Link href="/login" className="font-medium text-brand-ink hover:underline">
               Đăng nhập
             </Link>
           </p>

@@ -52,7 +52,7 @@ export default function RoomHistoryPage() {
 
   const backLink = (
     <p className="text-sm">
-      <Link href={historyPath()} className="font-medium text-indigo-400 hover:underline">
+      <Link href={historyPath()} className="font-medium text-brand-ink hover:underline">
         ← Lịch sử phiên
       </Link>
     </p>
@@ -62,7 +62,7 @@ export default function RoomHistoryPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">Không xem được lịch sử</h1>
-        <p role="alert" data-testid="room-history-error" className="text-sm text-rose-400">
+        <p role="alert" data-testid="room-history-error" className="text-sm text-danger-ink">
           {error}
         </p>
         {backLink}
@@ -73,7 +73,7 @@ export default function RoomHistoryPage() {
   if (!detail) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl items-center justify-center px-6 py-16">
-        <p data-testid="room-history-loading" className="text-sm text-slate-400">
+        <p data-testid="room-history-loading" className="text-sm text-ink-muted">
           Đang tải lịch sử…
         </p>
       </main>
@@ -83,11 +83,11 @@ export default function RoomHistoryPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-12">
       <header className="space-y-2">
-        <p className="text-sm uppercase tracking-widest text-indigo-400">Lịch sử phòng</p>
+        <p className="text-sm uppercase tracking-widest text-brand-ink">Lịch sử phòng</p>
         <h1 data-testid="room-history-name" className="text-3xl font-bold tracking-tight">
           {detail.room.name}
         </h1>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-ink-muted">
           Mã phòng: <span className="font-mono">{detail.room.code}</span> · Bộ thẻ:{' '}
           <span data-testid="room-history-deck">{detail.room.deckType}</span> ·{' '}
           <span data-testid="room-history-participants">
@@ -99,7 +99,7 @@ export default function RoomHistoryPage() {
       {detail.rounds.length === 0 ? (
         <p
           data-testid="room-history-no-rounds"
-          className="rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-6 text-sm text-slate-400"
+          className="rounded-lg border border-line bg-surface px-4 py-6 text-sm text-ink-muted"
         >
           Phòng này chưa có round nào.
         </p>
@@ -111,11 +111,11 @@ export default function RoomHistoryPage() {
               data-testid="room-history-round"
               data-round-number={entry.round.roundNumber}
               data-round-status={entry.round.status}
-              className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/60 p-5"
+              className="space-y-4 rounded-xl border border-line bg-surface p-5"
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="text-xl font-semibold">Round {entry.round.roundNumber}</h2>
-                <span className="text-xs text-slate-500" data-testid="round-revealed-at">
+                <span className="text-xs text-ink-subtle" data-testid="round-revealed-at">
                   {entry.round.revealedAt
                     ? `Lật bài lúc ${formatTimestamp(entry.round.revealedAt)}`
                     : 'Chưa lật bài'}
@@ -130,7 +130,7 @@ export default function RoomHistoryPage() {
                   deckType={detail.room.deckType}
                 />
               ) : (
-                <p data-testid="round-not-revealed" className="text-sm text-slate-400">
+                <p data-testid="round-not-revealed" className="text-sm text-ink-muted">
                   Round này kết thúc mà chưa lật bài, nên các lá bài vẫn được giữ kín.
                 </p>
               )}

@@ -92,7 +92,7 @@ export default function CreateRoomPage() {
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 px-6 py-16">
       <header className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Tạo phòng mới</h1>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-ink-muted">
           Sau khi tạo, bạn sẽ nhận được link mời để gửi cho team.
         </p>
       </header>
@@ -112,7 +112,7 @@ export default function CreateRoomPage() {
             value={name}
             onChange={(event) => setName(event.target.value)}
             data-testid="room-name-input"
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
+            className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-ink outline-none focus:border-brand"
           />
         </div>
 
@@ -121,7 +121,7 @@ export default function CreateRoomPage() {
           {DECK_TYPES.map((type) => (
             <label
               key={type}
-              className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 has-[:checked]:border-indigo-400"
+              className="flex cursor-pointer items-start gap-3 rounded-lg border border-line bg-surface px-3 py-2 has-[:checked]:border-brand"
             >
               <input
                 type="radio"
@@ -134,7 +134,7 @@ export default function CreateRoomPage() {
               />
               <span className="space-y-1">
                 <span className="block font-medium">{DECK_LABELS[type]}</span>
-                <span className="block font-mono text-xs text-slate-400">
+                <span className="block font-mono text-xs text-ink-muted">
                   {DECKS[type].join('  ·  ')}
                 </span>
               </span>
@@ -159,13 +159,13 @@ export default function CreateRoomPage() {
                 setDisplayName(event.target.value);
               }}
               data-testid="host-name-input"
-              className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
+              className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-ink outline-none focus:border-brand"
             />
           </div>
         )}
 
         {error ? (
-          <p role="alert" data-testid="create-room-error" className="text-sm text-rose-400">
+          <p role="alert" data-testid="create-room-error" className="text-sm text-danger-ink">
             {error}
           </p>
         ) : null}
@@ -174,13 +174,13 @@ export default function CreateRoomPage() {
           type="submit"
           disabled={submitting}
           data-testid="create-room-submit"
-          className="w-full rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white hover:bg-indigo-400 disabled:opacity-60"
+          className="w-full rounded-lg bg-brand px-4 py-2 font-semibold text-on-brand hover:bg-brand-strong disabled:opacity-60"
         >
           {submitting ? 'Đang tạo phòng…' : 'Tạo phòng'}
         </button>
       </form>
 
-      <Link href="/" className="text-sm font-medium text-indigo-400 hover:underline">
+      <Link href="/" className="text-sm font-medium text-brand-ink hover:underline">
         ← Về trang chủ
       </Link>
     </main>

@@ -111,10 +111,10 @@ export default function JoinRoomPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 px-6 py-16">
         <h1 className="text-3xl font-bold tracking-tight">Không vào được phòng</h1>
-        <p role="alert" data-testid="join-room-error" className="text-sm text-rose-400">
+        <p role="alert" data-testid="join-room-error" className="text-sm text-danger-ink">
           {lookupError}
         </p>
-        <Link href="/join" className="text-sm font-medium text-indigo-400 hover:underline">
+        <Link href="/join" className="text-sm font-medium text-brand-ink hover:underline">
           ← Nhập lại mã phòng
         </Link>
       </main>
@@ -126,15 +126,15 @@ export default function JoinRoomPage() {
       <header className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Vào phòng</h1>
         {room ? (
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-ink-muted">
             Phòng{' '}
-            <strong data-testid="join-room-name" className="text-slate-100">
+            <strong data-testid="join-room-name" className="text-ink">
               {room.name}
             </strong>{' '}
             · mã <span className="font-mono">{room.code}</span>
           </p>
         ) : (
-          <p className="text-sm text-slate-400" data-testid="join-room-loading">
+          <p className="text-sm text-ink-muted" data-testid="join-room-loading">
             Đang kiểm tra mã phòng…
           </p>
         )}
@@ -157,17 +157,17 @@ export default function JoinRoomPage() {
               setDisplayName(event.target.value);
             }}
             data-testid="join-name-input"
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
+            className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-ink outline-none focus:border-brand"
           />
           {signedIn ? (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-ink-subtle">
               Bạn đang đăng nhập. Có thể đổi tên hiển thị riêng cho phòng này.
             </p>
           ) : null}
         </div>
 
         {error ? (
-          <p role="alert" data-testid="join-room-error" className="text-sm text-rose-400">
+          <p role="alert" data-testid="join-room-error" className="text-sm text-danger-ink">
             {error}
           </p>
         ) : null}
@@ -176,7 +176,7 @@ export default function JoinRoomPage() {
           type="submit"
           disabled={submitting || !room}
           data-testid="join-room-submit"
-          className="w-full rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white hover:bg-indigo-400 disabled:opacity-60"
+          className="w-full rounded-lg bg-brand px-4 py-2 font-semibold text-on-brand hover:bg-brand-strong disabled:opacity-60"
         >
           {submitting ? 'Đang vào phòng…' : 'Vào phòng'}
         </button>
