@@ -1,3 +1,67 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Thrown emoji (see components/reaction-fx.tsx). The duration is set inline from
+ * `REACTION_TTL_MS`, so the animation and the list's own pruning end together.
+ */
+@layer utilities {
+  @keyframes reaction-float {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, 0) scale(0.6);
+    }
+    15% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translate(calc(-50% + var(--reaction-drift, 0px)), -8rem) scale(1.3);
+    }
+  }
+
+  @keyframes reaction-land {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, 5rem) scale(2.4) rotate(-25deg);
+    }
+    40% {
+      opacity: 1;
+    }
+    70% {
+      transform: translate(-50%, -2.25rem) scale(1.1) rotate(0deg);
+    }
+    100% {
+      opacity: 0;
+      transform: translate(-50%, -3.25rem) scale(1) rotate(0deg);
+    }
+  }
+
+  /* Still appears and still leaves — it simply does not fly. */
+  @keyframes reaction-still {
+    0%,
+    75% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  .animate-reaction-float {
+    animation: reaction-float ease-out forwards;
+  }
+
+  .animate-reaction-land {
+    animation: reaction-land cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-reaction-float,
+    .animate-reaction-land {
+      animation-name: reaction-still;
+      transform: translate(-50%, -2.5rem);
+    }
+  }
+}
