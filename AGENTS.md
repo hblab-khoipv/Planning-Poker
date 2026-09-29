@@ -77,7 +77,7 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   A room has two host facts and matching **either** is enough — `rooms.host_id` (the account, NULL
   for a guest-created room) or `rooms.host_participant_id` (the creator's seat, migration 0004,
   set for every room). Without the second, guest-created rooms — the primary MVP flow — would have
-  no one able to press "Lộ bài". See issue #9; PRD §12 asked the question, MVP answer is host-only.
+  no one able to press "Lật bài". See issue #9; PRD §12 asked the question, MVP answer is host-only.
 - "Vote lại" and "Task tiếp theo / Round mới" are one backend action (`round:reset` → a new
   `voting_rounds` row); only the button label differs. PRD §8 lists one event and §7 one record.
 - `POST /rooms` opens round 1 in the same transaction that creates the room and seats its host;

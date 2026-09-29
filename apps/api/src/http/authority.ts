@@ -1,7 +1,7 @@
 /**
  * Who may reveal a round or start a new one (PRD FR-5, FR-7).
  *
- * PRD §12 leaves "Ai được quyền bấm 'Lộ bài' — chỉ host, hay bất kỳ ai trong phòng?" open; the
+ * PRD §12 leaves "Ai được quyền bấm 'Lật bài' — chỉ host, hay bất kỳ ai trong phòng?" open; the
  * MVP answer is host-only, because reveal is the one irreversible action in a round and FR-4's
  * whole point is that nobody can turn the cards over early.
  *
