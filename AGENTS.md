@@ -120,9 +120,20 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   log name the exact cutoff it deleted by. Activity = write paths only (create/join/socket
   connect/vote/reveal/reset, all via `touchRoom`); reads never bump `last_active_at`, so polling
   cannot keep a dead room alive. README has the table and the env vars.
+- The **hand deploy** is the live path (docs/deployment.md §7): `deploy/scripts/push-from-laptop.sh`
+  builds on the operator's laptop and rsyncs `stage-release.sh`'s tree to the box;
+  `deploy/scripts/restart-on-box.sh` installs prod deps only when the manifests changed, migrates,
+  restarts (systemd units if installed, else pidfile-tracked background processes) and refuses to
+  report success without a 2xx from `/health` and `/`. The build is on the laptop because
+  `NEXT_PUBLIC_API_URL` is inlined at build time. Config is `deploy/env/{laptop-push,box-restart}.env`
+  (git-ignored; `.example` files are committed) — nothing about the box is in a script.
+  Production runs behind an **ALB**, not nginx: target groups on 3000/4000, API health check on
+  `/health` (never `/health/db` — a database blip would deregister the instance), and sticky
+  sessions become mandatory past one instance because Socket.io presence is per-process.
 - Deployment lives in `deploy/` + `.github/workflows/deploy.yml`, documented in `docs/deployment.md`.
-  Nothing is provisioned: task 10 was a _simulated_ deploy, so no EC2 instance, DNS record or
-  certificate exists and `deploy/scripts/bootstrap-server.sh` has never been executed.
+  That CI path stays simulated (`DEPLOY_SIMULATE=true`): merging to `main` does not touch the
+  server, and `deploy/scripts/bootstrap-server.sh` — Ubuntu/`apt-get` + nginx + certbot only, so
+  wrong for the Amazon Linux box — has never been executed.
   `deploy/scripts/lib.sh`'s `run_step` is the ONLY place the `DEPLOY_SIMULATE` repository variable
   is consulted — one script, two modes, so a simulated run is a real rehearsal of the live path.
   Anything other than the literal `false` keeps simulation on. Never echo a secret: command lines

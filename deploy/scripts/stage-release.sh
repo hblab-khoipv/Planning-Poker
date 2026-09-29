@@ -29,6 +29,9 @@ copy() {
 
 copy package.json
 copy package-lock.json
+# Postgres runs on the box from this exact file, so it has to travel with the release: the hand
+# deploy rsyncs the staged tree over the box's directory with --delete (deploy/scripts/push-from-laptop.sh).
+copy docker-compose.yml
 copy packages/shared/package.json
 copy packages/shared/dist
 copy apps/api/package.json

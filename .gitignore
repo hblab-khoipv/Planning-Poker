@@ -17,3 +17,8 @@ test-results/
 
 # Release tree staged by deploy/scripts/stage-release.sh
 .deploy-stage/
+
+# Rendered/hand-written env files for the box, and the manual deploy's pidfiles + logs.
+deploy/env/*.env
+!deploy/env/*.env.example
+.deploy-run/
