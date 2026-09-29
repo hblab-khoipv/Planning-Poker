@@ -1,6 +1,7 @@
 import {
   type ClientToServerEvents,
   type ParticipantDto,
+  type ReactionThrownPayload,
   type RoundRevealedPayload,
   type RoundResetPayload,
   SOCKET_EVENTS,
@@ -102,4 +103,19 @@ export function emitRoundReset(
   payload: RoundResetPayload,
 ): void {
   io.to(roomChannel(roomCode)).emit(SOCKET_EVENTS.ROUND_RESET, payload);
+}
+
+/**
+ * A thrown emoji, relayed to everybody in the room (ephemeral — see `reactions.ts`).
+ *
+ * It belongs here with the rest for the reason the module comment gives: this file is the whole
+ * answer to "what can the server send to a room?". The payload names a sender and a target seat
+ * and carries nothing from a round, so it stays outside FR-4's secrecy entirely.
+ */
+export function emitReactionThrown(
+  io: RealtimeServer,
+  roomCode: string,
+  payload: ReactionThrownPayload,
+): void {
+  io.to(roomChannel(roomCode)).emit(SOCKET_EVENTS.REACTION_THROWN, payload);
 }

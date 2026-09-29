@@ -3,6 +3,7 @@ export * from './events.js';
 export * from './history.js';
 export * from './participants.js';
 export * from './room-code.js';
+export * from './reactions.js';
 export * from './rooms.js';
 export * from './rounds.js';
 export * from './tally.js';

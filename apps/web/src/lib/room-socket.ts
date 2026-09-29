@@ -136,6 +136,23 @@ export function editVote(socket: RoomSocket, value: string): Promise<ActionAck> 
   return requestAction(socket, (ack) => socket.emit(SOCKET_EVENTS.VOTE_EDIT, { value }, ack));
 }
 
+/**
+ * Throw one emoji at the table, or at one person's seat.
+ *
+ * Deliberately outside the voting actions: it works in every round state and changes nothing the
+ * round knows about. Like every other action it names no sender — who threw it is settled by the
+ * socket's own handshake.
+ */
+export function throwReaction(
+  socket: RoomSocket,
+  emoji: string,
+  targetParticipantId: string | null = null,
+): Promise<ActionAck> {
+  return requestAction(socket, (ack) =>
+    socket.emit(SOCKET_EVENTS.REACTION_THROW, { emoji, targetParticipantId }, ack),
+  );
+}
+
 /** FR-5: turn every card over. The server refuses anybody who is not the host. */
 export function revealRound(socket: RoomSocket): Promise<ActionAck> {
   return requestAction(socket, (ack) => socket.emit(SOCKET_EVENTS.ROUND_REVEAL, ack));
@@ -168,6 +185,12 @@ export function messageForActionError(ack: ActionAck): string | null {
       return 'Thẻ này không thuộc bộ thẻ của phòng.';
     case VOTE_ERROR_CODES.NO_ROUND:
       return 'Phòng chưa có round nào.';
+    case VOTE_ERROR_CODES.RATE_LIMITED:
+      return 'Bạn ném nhanh quá, chờ một chút nhé.';
+    case VOTE_ERROR_CODES.INVALID_EMOJI:
+      return 'Emoji này không nằm trong bộ cho phép.';
+    case VOTE_ERROR_CODES.INVALID_TARGET:
+      return 'Người bạn muốn ném không còn trong phòng.';
     default:
       return ack.message;
   }

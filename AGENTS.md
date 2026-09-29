@@ -153,6 +153,10 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   and CI — means NextAuth's defaults, unchanged.
 - `NEXT_PUBLIC_API_URL` is baked into the browser bundle by `next build`, so changing it needs a
   rebuild, not a restart; it is set in the deploy workflow's build job as well as in `web.env`.
+- Thrown emoji (`realtime/reactions.ts` + `web/src/lib/reactions.ts`) are the one feature that
+  touches no round: nothing is persisted, `touchRoom` is deliberately not called (cheering must
+  not keep an idle room alive), and the palette + rate limit live in `packages/shared`'s
+  `reactions.ts` so the buttons a browser renders are exactly what the server accepts.
 - Integration tests get fixtures from `apps/api/tests/helpers/seed.ts` (`seedRoomWithRound`,
   `truncateAll`); they build rows through the real repositories, so use them rather than raw INSERTs.
 

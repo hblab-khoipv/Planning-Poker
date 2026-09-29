@@ -19,6 +19,7 @@ import {
 } from './channel.js';
 import { authenticateHandshake, SocketAuthError } from './identity.js';
 import { PresenceTracker, type PresenceTimers } from './presence.js';
+import { ReactionRateLimiter, registerReactionHandlers } from './reactions.js';
 import { registerVotingHandlers } from './voting.js';
 
 /**
@@ -37,6 +38,8 @@ export interface RealtimeOptions {
   graceMs?: number;
   /** Injected by the tests so a grace window can pass without really waiting. */
   timers?: PresenceTimers;
+  /** Overrides for the emoji-throw throttle; the defaults come from `@planning-poker/shared`. */
+  reactionLimit?: { maxPerWindow?: number; windowMs?: number; now?: () => number };
 }
 
 /** Resolved once per connection and kept on the socket, so handlers never re-read the cookie. */
@@ -57,6 +60,10 @@ export function attachRealtime(
   pool: pg.Pool,
   options: RealtimeOptions = {},
 ): RealtimeHandle {
+  // One limiter for the whole server, keyed by seat: a second tab is the same person, so it
+  // shares the budget rather than doubling it.
+  const reactionLimiter = new ReactionRateLimiter(options.reactionLimit ?? {});
+
   const presence = new PresenceTracker({
     graceMs: options.graceMs ?? config.socketDisconnectGraceMs,
     ...(options.timers ? { timers: options.timers } : {}),
@@ -84,6 +91,7 @@ export function attachRealtime(
     const channel = roomChannel(room.code);
 
     registerVotingHandlers(io, pool, socket, { room, participant });
+    registerReactionHandlers(io, pool, socket, { room, participant }, { limiter: reactionLimiter });
 
     void (async () => {
       await socket.join(channel);
@@ -127,6 +135,7 @@ export function attachRealtime(
 
     socket.on('disconnect', () => {
       presence.detach(participant.id, socket.id, () => {
+        reactionLimiter.forget(participant.id);
         void setParticipantOnline(pool, participant.id, false)
           .then(() => {
             emitParticipantLeft(io, room.code, participant.id);

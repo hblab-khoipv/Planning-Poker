@@ -1,4 +1,5 @@
 import type { ParticipantDto } from './rooms.js';
+import type { ReactionThrownPayload, ReactionThrowRequest } from './reactions.js';
 import type { RevealedVoteDto, RoundDto, RoundStateDto } from './rounds.js';
 import type { RoundTally } from './tally.js';
 
@@ -18,6 +19,10 @@ export const SOCKET_EVENTS = {
   ROUND_REVEAL: 'round:reveal',
   ROUND_REVEALED: 'round:revealed',
   ROUND_RESET: 'round:reset',
+  /** Client→server: throw an emoji at the table or at somebody's seat. */
+  REACTION_THROW: 'reaction:throw',
+  /** Server→client: relay that throw to the whole room. Nothing about it is persisted. */
+  REACTION_THROWN: 'reaction:thrown',
 } as const;
 
 export type SocketEventName = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
@@ -151,6 +156,11 @@ export const VOTE_ERROR_CODES = {
   /** There is no card of this person's to edit: they never voted in this round. */
   NO_VOTE: 'no_vote',
   INVALID_CARD: 'invalid_card',
+  /** Reactions. They share this enum because `ActionAck` is the acknowledgement of *every*
+   * client→server action, not only the voting ones. */
+  INVALID_EMOJI: 'invalid_emoji',
+  INVALID_TARGET: 'invalid_target',
+  RATE_LIMITED: 'rate_limited',
   INTERNAL: 'internal',
 } as const;
 
@@ -170,6 +180,7 @@ export interface ServerToClientEvents {
   [SOCKET_EVENTS.VOTE_EDITED]: (payload: VoteEditedPayload) => void;
   [SOCKET_EVENTS.ROUND_REVEALED]: (payload: RoundRevealedPayload) => void;
   [SOCKET_EVENTS.ROUND_RESET]: (payload: RoundResetPayload) => void;
+  [SOCKET_EVENTS.REACTION_THROWN]: (payload: ReactionThrownPayload) => void;
 }
 
 /**
@@ -188,6 +199,7 @@ export interface ClientToServerEvents {
   [SOCKET_EVENTS.VOTE_EDIT]: (payload: VoteCastRequest, ack?: AckFn) => void;
   [SOCKET_EVENTS.ROUND_REVEAL]: (ack?: AckFn) => void;
   [SOCKET_EVENTS.ROUND_RESET]: (ack?: AckFn) => void;
+  [SOCKET_EVENTS.REACTION_THROW]: (payload: ReactionThrowRequest, ack?: AckFn) => void;
 }
 
 /**

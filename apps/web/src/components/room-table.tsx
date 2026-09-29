@@ -1,6 +1,8 @@
 'use client';
 
 import type { ParticipantDto, RevealedVoteDto } from '@planning-poker/shared';
+import { SeatReactions, TableReactions } from '@/components/reaction-fx';
+import { type LiveReaction, seatReactions, tableReactions } from '@/lib/reactions';
 import { arrangeSeats, type SeatCardState, seatCardState } from '@/lib/table-seats';
 
 /**
@@ -61,6 +63,7 @@ export function RoomTable({
   revealedVotes = null,
   myVote = null,
   isRevealed = false,
+  reactions = [],
   onEditVote,
 }: {
   participants: ParticipantDto[];
@@ -73,6 +76,8 @@ export function RoomTable({
   /** This browser's own card, which it may see before anybody else does. */
   myVote?: string | null;
   isRevealed?: boolean;
+  /** Emoji currently in flight. Drawn over the table and the seats, never into their layout. */
+  reactions?: LiveReaction[];
   /** Offered on this browser's own seat only, and only after the reveal (issue #11). */
   onEditVote?: (() => void) | undefined;
 }) {
@@ -88,6 +93,7 @@ export function RoomTable({
       isRevealed={isRevealed}
       isMe={participant.id === currentParticipantId}
       myVote={myVote}
+      reactions={seatReactions(reactions, participant.id)}
       onEditVote={onEditVote}
     />
   );
@@ -137,7 +143,7 @@ export function RoomTable({
             <div
               data-testid="table-surface"
               data-state={isRevealed ? 'revealed' : 'voting'}
-              className={`flex min-h-[9rem] w-full max-w-md items-center justify-center rounded-[2.5rem] border-4 px-6 py-8 text-center text-sm font-semibold transition ${
+              className={`relative flex min-h-[9rem] w-full max-w-md items-center justify-center overflow-hidden rounded-[2.5rem] border-4 px-6 py-8 text-center text-sm font-semibold transition ${
                 isRevealed
                   ? 'border-emerald-900/60 bg-emerald-800/70 text-emerald-50'
                   : 'border-slate-800 bg-slate-800/70 text-slate-300'
@@ -146,6 +152,7 @@ export function RoomTable({
               <span data-testid="table-status">
                 {isRevealed ? 'Bài đã lật' : 'Đang chờ mọi người chọn bài…'}
               </span>
+              <TableReactions reactions={tableReactions(reactions)} />
             </div>
 
             <div className="flex flex-col items-center gap-4">{seating.right.map(seat)}</div>
@@ -175,6 +182,7 @@ function Seat({
   isRevealed,
   isMe,
   myVote,
+  reactions,
   onEditVote,
 }: {
   participant: ParticipantDto;
@@ -183,6 +191,7 @@ function Seat({
   isRevealed: boolean;
   isMe: boolean;
   myVote: string | null;
+  reactions: LiveReaction[];
   onEditVote?: (() => void) | undefined;
 }) {
   const state = seatCardState({
@@ -220,6 +229,8 @@ function Seat({
             ✎ đã sửa
           </span>
         ) : null}
+
+        <SeatReactions reactions={reactions} />
       </div>
 
       {/* The card itself already shows the value; this span is what a screen reader reads, and

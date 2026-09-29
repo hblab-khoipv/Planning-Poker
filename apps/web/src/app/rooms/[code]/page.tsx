@@ -9,6 +9,7 @@ import {
   parseRoomCode,
   type RoomDto,
   type RevealedVoteDto,
+  type ReactionThrownPayload,
   type RoomStatePayload,
   type RoundDto,
   type RoundResetPayload,
@@ -21,11 +22,13 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { InviteLink } from '@/components/invite-link';
+import { ReactionBar } from '@/components/reaction-bar';
 import { RoomTable } from '@/components/room-table';
 import { RoundResults } from '@/components/round-results';
 import { VoteDeck } from '@/components/vote-deck';
 import { fetchParticipants, fetchRoom, messageForError } from '@/lib/api-client';
 import { browserIdentityStore } from '@/lib/guest-identity';
+import { applyReactionThrown, type LiveReaction, pruneReactions } from '@/lib/reactions';
 import { readRoomMembership } from '@/lib/room-membership';
 import {
   applyParticipantJoined,
@@ -39,6 +42,7 @@ import {
   revealRound,
   type RoomSocket,
   SOCKET_EVENTS,
+  throwReaction,
   votesByParticipant,
 } from '@/lib/room-socket';
 
@@ -87,6 +91,17 @@ export default function RoomPage() {
    * the room learns is the change itself, once it is made.
    */
   const [editingVote, setEditingVote] = useState(false);
+
+  /**
+   * Emoji currently in flight, and who the next one is aimed at (null = the table).
+   *
+   * Entirely local and entirely ephemeral: the server keeps nothing, so a reload simply starts
+   * from an empty table. Nothing here feeds the round state, which is what lets the room throw
+   * tomatoes through a reveal without disturbing it.
+   */
+  const [reactions, setReactions] = useState<readonly LiveReaction[]>([]);
+  const [reactionTarget, setReactionTarget] = useState<string | null>(null);
+  const [reactionError, setReactionError] = useState<string | null>(null);
 
   // Held in a ref rather than state: the handlers need the live socket, and re-rendering when it
   // changes would tear the room's event subscriptions down mid-round.
@@ -187,6 +202,14 @@ export default function RoomPage() {
       }
     });
 
+    socket.on(SOCKET_EVENTS.REACTION_THROWN, (payload: ReactionThrownPayload) => {
+      // `Date.now()` rather than the payload's own clock: expiry is measured on this screen, so
+      // a browser whose clock is off by an hour still shows the emoji for the right two seconds.
+      setReactions((current) =>
+        applyReactionThrown(current, { ...payload, thrownAt: Date.now() }, Date.now()),
+      );
+    });
+
     // A reset clears every trace of the previous round, this browser's own card included.
     socket.on(SOCKET_EVENTS.ROUND_RESET, (payload: RoundResetPayload) => {
       setRound(payload.round);
@@ -204,6 +227,24 @@ export default function RoomPage() {
       socket.disconnect();
     };
   }, [code, mySeatId, seatChecked]);
+
+  // One timer for the whole list: an emoji leaves the DOM as its animation ends, and a quiet
+  // room costs nothing because `pruneReactions` returns the same array when nothing expired.
+  useEffect(() => {
+    if (reactions.length === 0) return;
+    const timer = setInterval(
+      () => setReactions((current) => pruneReactions(current, Date.now())),
+      400,
+    );
+    return () => clearInterval(timer);
+  }, [reactions.length]);
+
+  // A seat that leaves the room stops being a valid target, so the picker falls back to the table.
+  useEffect(() => {
+    if (reactionTarget && !participants.some((p) => p.id === reactionTarget)) {
+      setReactionTarget(null);
+    }
+  }, [participants, reactionTarget]);
 
   const mySeat = useMemo(
     () => participants.find((participant) => participant.id === mySeatId) ?? null,
@@ -253,6 +294,19 @@ export default function RoomPage() {
     setEditingVote(true);
     setActionError(null);
   }, []);
+
+  // Its own error state, not `runAction`'s: a throw must never clear or overwrite a vote,
+  // reveal or edit refusal, and a refused throw does not belong in the room's main alert.
+  const onThrowReaction = useCallback(
+    (emoji: string) => {
+      const socket = socketRef.current;
+      if (!socket) return;
+      void throwReaction(socket, emoji, reactionTarget).then((ack) =>
+        setReactionError(messageForActionError(ack)),
+      );
+    },
+    [reactionTarget],
+  );
 
   const onReveal = useCallback(() => void runAction(revealRound), [runAction]);
   const onReset = useCallback(() => void runAction(resetRound), [runAction]);
@@ -333,6 +387,7 @@ export default function RoomPage() {
         revealedVotes={revealed?.votes ?? null}
         myVote={myVote}
         isRevealed={isRevealed}
+        reactions={reactions as LiveReaction[]}
         onEditVote={mySeatId && myVote !== null ? onStartEditingVote : undefined}
       />
 
@@ -347,6 +402,24 @@ export default function RoomPage() {
           editing={editingVote}
           onSelect={onSelectCard}
         />
+      ) : null}
+
+      {/* Reactions work in every round state, so this is outside the deck's revealed/editing
+          branching entirely — the one thing in the room that is never locked. */}
+      {mySeatId ? (
+        <ReactionBar
+          participants={participants}
+          currentParticipantId={mySeatId}
+          targetParticipantId={reactionTarget}
+          onChangeTarget={setReactionTarget}
+          onThrow={onThrowReaction}
+          disabled={connection !== 'live'}
+        />
+      ) : null}
+      {mySeatId && reactionError ? (
+        <p role="alert" data-testid="reaction-error" className="text-xs text-rose-400">
+          {reactionError}
+        </p>
       ) : null}
 
       {/* FR-5/FR-7: host-only. The server refuses anybody else regardless, so hiding the
