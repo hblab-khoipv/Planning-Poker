@@ -51,25 +51,30 @@ export function toRoundHistoryEntryDto(
 /**
  * Whether this caller may read one room's history.
  *
- * Two facts, and both are required:
+ * Two independent ways in, and matching either is enough:
  *
- * - There is a signed-in caller at all. A guest is identified by a participant id their own
- *   browser holds, which names a seat in one room and nothing else; honouring it here would turn
- *   any leaked or guessed seat id into a key to that room's past votes, and there is no account
- *   for the history to belong to anyway (PRD §3.1.10: "chỉ cho user đã đăng nhập").
- * - That account holds a seat in this room. Not "the room exists" and not "the caller is the
- *   host" — FR-9 is about the sessions *you took part in*, so a signed-in stranger is refused
- *   exactly like a guest is.
+ * - **An account with a seat in this room.** FR-9's own rule, unchanged: not "the room exists"
+ *   and not "the caller is the host", so a signed-in stranger is refused. This is the one that
+ *   works from the history screens, long after the meeting and from any browser.
+ * - **A seat in this room, held right now.** The in-room history panel and its export, added for
+ *   the round-history/export work. A guest is identified by the participant id their own browser
+ *   stored when they joined (`lib/room-membership.ts`), which is the same credential the socket
+ *   already accepts (`realtime/identity.ts`) — and that socket streams this room's revealed
+ *   rounds live. Honouring it here therefore grants nothing new; refusing it would mean the
+ *   primary MVP flow, a guest-hosted room, had a history panel nobody in the room could open.
  *
- * Deliberately a pure predicate over two booleans rather than a function that queries: the
- * membership read belongs to `isRoomMember`, and keeping the decision separate from the lookup
- * is what lets both outcomes be asserted directly. Compare `http/authority.ts`, which answers
- * the neighbouring question of who may *reveal*.
+ * Still deliberately a pure predicate over booleans rather than a function that queries: the two
+ * lookups belong to `isRoomMember` and `findParticipantInRoom`, and keeping the decision apart
+ * from them is what lets every outcome be asserted directly. Compare `http/authority.ts`, which
+ * answers the neighbouring question of who may *reveal*.
  */
 export function canViewRoomHistory(options: {
   callerUserId: string | null;
   isMember: boolean;
+  /** The caller presented a participant id that names a seat in this very room. */
+  hasSeatInRoom?: boolean;
 }): boolean {
+  if (options.hasSeatInRoom === true) return true;
   if (options.callerUserId === null) return false;
   return options.isMember;
 }

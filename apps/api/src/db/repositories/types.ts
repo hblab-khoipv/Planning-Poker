@@ -49,6 +49,8 @@ export interface VotingRound {
   roomId: string;
   roundNumber: number;
   status: RoundStatus;
+  /** The item this round estimated (migration 0007), or null when nobody named it. */
+  story: string | null;
   createdAt: Date;
   revealedAt: Date | null;
 }

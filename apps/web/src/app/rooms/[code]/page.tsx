@@ -15,6 +15,7 @@ import {
   type RoundResetPayload,
   type RoundRevealedPayload,
   type RoundTally,
+  type RoundUpdatedPayload,
   type VoteCastPayload,
   type VoteEditedPayload,
 } from '@planning-poker/shared';
@@ -23,8 +24,10 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { InviteLink } from '@/components/invite-link';
 import { ReactionBar } from '@/components/reaction-bar';
+import { RoomHistoryPanel } from '@/components/room-history-panel';
 import { RoomTable } from '@/components/room-table';
 import { RoundResults } from '@/components/round-results';
+import { RoundStory } from '@/components/round-story';
 import { VoteDeck } from '@/components/vote-deck';
 import { fetchParticipants, fetchRoom, messageForError } from '@/lib/api-client';
 import { browserIdentityStore } from '@/lib/guest-identity';
@@ -41,6 +44,7 @@ import {
   resetRound,
   revealRound,
   type RoomSocket,
+  setRoundStory,
   SOCKET_EVENTS,
   throwReaction,
   votesByParticipant,
@@ -210,6 +214,11 @@ export default function RoomPage() {
       );
     });
 
+    // Only the round's own fields moved (its story), so nothing about the votes is touched.
+    socket.on(SOCKET_EVENTS.ROUND_UPDATED, (payload: RoundUpdatedPayload) => {
+      setRound(payload.round);
+    });
+
     // A reset clears every trace of the previous round, this browser's own card included.
     socket.on(SOCKET_EVENTS.ROUND_RESET, (payload: RoundResetPayload) => {
       setRound(payload.round);
@@ -308,6 +317,11 @@ export default function RoomPage() {
     [reactionTarget],
   );
 
+  const onSetStory = useCallback(
+    (story: string) => void runAction((socket) => setRoundStory(socket, story)),
+    [runAction],
+  );
+
   const onReveal = useCallback(() => void runAction(revealRound), [runAction]);
   const onReset = useCallback(() => void runAction(resetRound), [runAction]);
 
@@ -350,12 +364,15 @@ export default function RoomPage() {
           · Bộ thẻ: <span data-testid="room-deck-type">{room.deckType}</span>
         </p>
         {round ? (
-          <p className="text-sm text-slate-400">
-            Round <span data-testid="round-number">{round.roundNumber}</span> ·{' '}
-            <span data-testid="round-status" data-state={round.status}>
-              {isRevealed ? 'Đã lật bài' : 'Đang vote'}
-            </span>
-          </p>
+          <>
+            <p className="text-sm text-slate-400">
+              Round <span data-testid="round-number">{round.roundNumber}</span> ·{' '}
+              <span data-testid="round-status" data-state={round.status}>
+                {isRevealed ? 'Đã lật bài' : 'Đang vote'}
+              </span>
+            </p>
+            <RoundStory story={round.story} canEdit={isHost} onSubmit={onSetStory} />
+          </>
         ) : null}
       </header>
 
@@ -466,6 +483,14 @@ export default function RoomPage() {
           deckType={room.deckType}
         />
       ) : null}
+
+      {/* Collapsed by default, so the room still fits one screen. The key is what the panel
+          watches: any of these changing means the history it is showing is now stale. */}
+      <RoomHistoryPanel
+        code={room.code}
+        participantId={mySeatId}
+        refreshKey={`${round?.id ?? ''}:${round?.status ?? ''}:${round?.story ?? ''}`}
+      />
     </main>
   );
 }

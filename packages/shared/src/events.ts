@@ -23,6 +23,10 @@ export const SOCKET_EVENTS = {
   REACTION_THROW: 'reaction:throw',
   /** Server→client: relay that throw to the whole room. Nothing about it is persisted. */
   REACTION_THROWN: 'reaction:thrown',
+  /** Client→server: the host naming the item this round is estimating. */
+  ROUND_STORY: 'round:story',
+  /** Server→client: a round's own fields changed (today: its story). */
+  ROUND_UPDATED: 'round:updated',
 } as const;
 
 export type SocketEventName = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
@@ -128,6 +132,22 @@ export interface RoundResetPayload {
 }
 
 /**
+ * A round whose own fields changed, today only its story.
+ *
+ * Separate from `round:reset` because the round is the same one: a client applies this by
+ * replacing the round and touching nothing else, so a story typed mid-vote cannot clear the
+ * cards already cast. It carries no votes, so it is safe to broadcast at any status.
+ */
+export interface RoundUpdatedPayload {
+  round: RoundDto;
+}
+
+/** What the host sends to name the current round. An empty string clears the name. */
+export interface SetRoundStoryRequest {
+  story: string;
+}
+
+/**
  * What the client sends when somebody picks a card. The value is checked against the deck.
  *
  * `vote:edit` reuses this shape deliberately: an edit is the same "here is my card" message, and
@@ -151,6 +171,8 @@ export const VOTE_ERROR_CODES = {
   NOT_HOST: 'not_host',
   NO_ROUND: 'no_round',
   ROUND_NOT_OPEN: 'round_not_open',
+  /** A story longer than `MAX_STORY_LENGTH`, or otherwise not a string. */
+  INVALID_STORY: 'invalid_story',
   /** An edit aimed at a round whose cards are still face down — that is a plain vote. */
   ROUND_NOT_REVEALED: 'round_not_revealed',
   /** There is no card of this person's to edit: they never voted in this round. */
@@ -181,6 +203,7 @@ export interface ServerToClientEvents {
   [SOCKET_EVENTS.ROUND_REVEALED]: (payload: RoundRevealedPayload) => void;
   [SOCKET_EVENTS.ROUND_RESET]: (payload: RoundResetPayload) => void;
   [SOCKET_EVENTS.REACTION_THROWN]: (payload: ReactionThrownPayload) => void;
+  [SOCKET_EVENTS.ROUND_UPDATED]: (payload: RoundUpdatedPayload) => void;
 }
 
 /**
@@ -200,6 +223,7 @@ export interface ClientToServerEvents {
   [SOCKET_EVENTS.ROUND_REVEAL]: (ack?: AckFn) => void;
   [SOCKET_EVENTS.ROUND_RESET]: (ack?: AckFn) => void;
   [SOCKET_EVENTS.REACTION_THROW]: (payload: ReactionThrowRequest, ack?: AckFn) => void;
+  [SOCKET_EVENTS.ROUND_STORY]: (payload: SetRoundStoryRequest, ack?: AckFn) => void;
 }
 
 /**

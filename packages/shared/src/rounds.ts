@@ -9,11 +9,30 @@ export function isRoundStatus(value: unknown): value is RoundStatus {
   return typeof value === 'string' && (ROUND_STATUSES as readonly string[]).includes(value);
 }
 
+/**
+ * The story a round is estimating (PRD §4 step 5's "task đang thảo luận").
+ *
+ * One free-text label per round, not a backlog: PRD §11 keeps "quản lý nhiều task trong 1 phòng"
+ * out of the MVP, and a round that already exists per estimated item is the natural place to
+ * write down which item that was. Shared because the API stores it and the export prints it, and
+ * `voting_rounds.story` has a `char_length(btrim(...)) > 0` CHECK — so a blank one must become
+ * NULL here rather than reaching Postgres as a 500.
+ */
+export const MAX_STORY_LENGTH = 120;
+
+/** Collapses whitespace, clips to the column's limit, and turns "nothing typed" into null. */
+export function normalizeStory(raw: string): string | null {
+  const text = raw.trim().replace(/\s+/g, ' ').slice(0, MAX_STORY_LENGTH);
+  return text.length === 0 ? null : text;
+}
+
 /** The wire shape of a `voting_rounds` row. Dates are ISO strings: JSON has no date type. */
 export interface RoundDto {
   id: string;
   roundNumber: number;
   status: RoundStatus;
+  /** What this round estimated, or null when nobody named it. */
+  story: string | null;
   createdAt: string;
   revealedAt: string | null;
 }

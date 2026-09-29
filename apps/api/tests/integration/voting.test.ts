@@ -6,6 +6,7 @@ import {
   type RoundResetPayload,
   type RoundRevealedPayload,
   type RoundStateResponse,
+  type RoundUpdatedPayload,
   SOCKET_EVENTS,
   VOTE_ERROR_CODES,
   type VoteCastPayload,
@@ -23,6 +24,7 @@ import {
   addParticipant,
   createRound,
   findCurrentRound,
+  listRoundsWithVotes,
   listVotesForRound,
   type Participant,
   type Room,
@@ -697,6 +699,110 @@ describe('voting, reveal and new rounds', () => {
 
       await new Promise((resolve) => setTimeout(resolve, 150));
       expect(leaked).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Naming the round (migration 0007) — the label the score history and the export hang on.
+   *
+   * Host-only like reveal and reset, and allowed at any status: the whole point is that a host
+   * who only writes the story down after the cards are up still gets a usable history.
+   */
+  describe('naming the round’s story', () => {
+    it('broadcasts the host’s story to the room and stores it on the round', async () => {
+      const { room, host, lan } = await seatedRoom();
+      const hostSocket = await open({ roomCode: room.code, participantId: host.id });
+      await nextEvent<RoomStatePayload>(hostSocket, SOCKET_EVENTS.ROOM_STATE);
+      const lanSocket = await open({ roomCode: room.code, participantId: lan.id });
+      await nextEvent<RoomStatePayload>(lanSocket, SOCKET_EVENTS.ROOM_STATE);
+
+      const seen = nextEvent<RoundUpdatedPayload>(lanSocket, SOCKET_EVENTS.ROUND_UPDATED);
+      await expect(
+        emit(hostSocket, SOCKET_EVENTS.ROUND_STORY, { story: '  Đăng nhập   bằng Google ' }),
+      ).resolves.toEqual({ ok: true });
+
+      // Normalised once, on the server, so every screen and the export read the same string.
+      expect((await seen).round).toMatchObject({
+        roundNumber: 1,
+        story: 'Đăng nhập bằng Google',
+      });
+      expect(await findCurrentRound(db, room.id)).toMatchObject({
+        story: 'Đăng nhập bằng Google',
+      });
+    });
+
+    it('refuses a non-host and tells the room nothing', async () => {
+      const { room, host, lan } = await seatedRoom();
+      const hostSocket = await open({ roomCode: room.code, participantId: host.id });
+      await nextEvent<RoomStatePayload>(hostSocket, SOCKET_EVENTS.ROOM_STATE);
+      const lanSocket = await open({ roomCode: room.code, participantId: lan.id });
+      await nextEvent<RoomStatePayload>(lanSocket, SOCKET_EVENTS.ROOM_STATE);
+
+      const leaked = vi.fn();
+      hostSocket.on(SOCKET_EVENTS.ROUND_UPDATED, leaked);
+
+      await expect(
+        emit(lanSocket, SOCKET_EVENTS.ROUND_STORY, { story: 'Của tôi' }),
+      ).resolves.toMatchObject({ ok: false, code: VOTE_ERROR_CODES.NOT_HOST });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(leaked).not.toHaveBeenCalled();
+      expect(await findCurrentRound(db, room.id)).toMatchObject({ story: null });
+    });
+
+    it('refuses a story longer than the column allows', async () => {
+      const { room, host } = await seatedRoom();
+      const hostSocket = await open({ roomCode: room.code, participantId: host.id });
+      await nextEvent<RoomStatePayload>(hostSocket, SOCKET_EVENTS.ROOM_STATE);
+
+      await expect(
+        emit(hostSocket, SOCKET_EVENTS.ROUND_STORY, { story: 'x'.repeat(200) }),
+      ).resolves.toMatchObject({ ok: false, code: VOTE_ERROR_CODES.INVALID_STORY });
+      expect(await findCurrentRound(db, room.id)).toMatchObject({ story: null });
+    });
+
+    it('clears the story when the host empties the box', async () => {
+      const { room, host } = await seatedRoom();
+      const hostSocket = await open({ roomCode: room.code, participantId: host.id });
+      await nextEvent<RoomStatePayload>(hostSocket, SOCKET_EVENTS.ROOM_STATE);
+
+      await emit(hostSocket, SOCKET_EVENTS.ROUND_STORY, { story: 'Sai rồi' });
+      await emit(hostSocket, SOCKET_EVENTS.ROUND_STORY, { story: '   ' });
+
+      expect(await findCurrentRound(db, room.id)).toMatchObject({ story: null });
+    });
+
+    /**
+     * Two rounds played through, which is what an export of a real session looks like: each
+     * round keeps its own story and its own cards, and a new round starts unnamed rather than
+     * inheriting the last one's label.
+     */
+    it('keeps a story per round across a reveal and a new round', async () => {
+      const { room, host, lan } = await seatedRoom();
+      const hostSocket = await open({ roomCode: room.code, participantId: host.id });
+      await nextEvent<RoomStatePayload>(hostSocket, SOCKET_EVENTS.ROOM_STATE);
+      const lanSocket = await open({ roomCode: room.code, participantId: lan.id });
+      await nextEvent<RoomStatePayload>(lanSocket, SOCKET_EVENTS.ROOM_STATE);
+
+      await emit(hostSocket, SOCKET_EVENTS.ROUND_STORY, { story: 'Story A' });
+      await emit(lanSocket, SOCKET_EVENTS.VOTE_CAST, { value: '5' });
+      await emit(hostSocket, SOCKET_EVENTS.ROUND_REVEAL);
+
+      await emit(hostSocket, SOCKET_EVENTS.ROUND_RESET);
+      expect(await findCurrentRound(db, room.id)).toMatchObject({
+        roundNumber: 2,
+        story: null,
+      });
+
+      await emit(hostSocket, SOCKET_EVENTS.ROUND_STORY, { story: 'Story B' });
+      await emit(lanSocket, SOCKET_EVENTS.VOTE_CAST, { value: '8' });
+      await emit(hostSocket, SOCKET_EVENTS.ROUND_REVEAL);
+
+      const history = await listRoundsWithVotes(db, room.id);
+      expect(history.map((entry) => [entry.round.story, entry.votes[0]?.value])).toEqual([
+        ['Story A', '5'],
+        ['Story B', '8'],
+      ]);
     });
   });
 });

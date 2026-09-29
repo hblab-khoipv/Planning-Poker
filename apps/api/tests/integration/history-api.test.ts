@@ -12,8 +12,10 @@ import {
   createRound,
   isRoomMember,
   listRoomHistoryForUser,
+  listRounds,
   revealRound,
   type Room,
+  setRoundStory,
   type User,
 } from '../../src/db/repositories/index.js';
 import { seedGuest, seedRoom, seedUser, truncateAll } from '../helpers/seed.js';
@@ -324,27 +326,85 @@ describe('session history API', () => {
     });
 
     /**
-     * Knowing the room code is what the invite link gives you, and it is deliberately not enough:
-     * a guest holding the code — or a stolen seat id — gets no archive at all.
+     * Knowing the room code is what the invite link gives you, and it is deliberately not enough
+     * on its own: somebody who never joined has no seat to present.
      */
-    it('refuses a guest holding the room code', async () => {
+    it('refuses a guest holding nothing but the room code', async () => {
       const member = await seedUser(db);
-      const { room, guestSeatId } = await playRoom(member, {
-        name: 'Invite only',
-        votes: ['5', '8'],
-      });
+      const { room } = await playRoom(member, { name: 'Invite only', votes: ['5', '8'] });
 
       const response = await request(app).get(`/rooms/${room.code}/rounds`);
 
       expect(response.status).toBe(401);
       expect(response.body.error.code).toBe('unauthorized');
+      expect(JSON.stringify(response.body)).not.toContain('"5"');
+    });
 
-      // There is no parameter a guest could present to get in either: the endpoint reads the
-      // cookie and nothing else.
-      const withSeat = await request(app)
+    /**
+     * The in-room history panel, which a guest must be able to open: their browser presents the
+     * seat it stored when it joined, the same credential the socket handshake takes. The seat is
+     * matched against *this* room, so it is evidence of sitting here and of nothing else.
+     */
+    it('lets a guest read the history of the room they hold a seat in', async () => {
+      const member = await seedUser(db);
+      const { room, guestSeatId } = await playRoom(member, {
+        name: 'Guest panel',
+        votes: ['5', '8'],
+      });
+
+      const response = await request(app)
         .get(`/rooms/${room.code}/rounds`)
         .query({ participantId: guestSeatId });
-      expect(withSeat.status).toBe(401);
+
+      expect(response.status).toBe(200);
+      expect(response.body.rounds).toHaveLength(1);
+      expect(response.body.rounds[0].tally).toMatchObject({ voteCount: 2, average: 6.5 });
+    });
+
+    it('does not let a seat in one room open another room’s history', async () => {
+      const member = await seedUser(db);
+      const mine = await playRoom(member, { name: 'Mine', votes: ['1', '2'] });
+      const theirs = await playRoom(member, { name: 'Theirs', votes: ['5', '8'] });
+
+      const response = await request(app)
+        .get(`/rooms/${theirs.room.code}/rounds`)
+        .query({ participantId: mine.guestSeatId });
+
+      expect(response.status).toBe(401);
+      expect(JSON.stringify(response.body)).not.toContain('"8"');
+    });
+
+    it.each(['not-a-uuid', '99999999-9999-4999-8999-999999999999'])(
+      'refuses the invented participant id %j',
+      async (participantId) => {
+        const member = await seedUser(db);
+        const { room } = await playRoom(member, { name: 'Guessing', votes: ['5', '8'] });
+
+        const response = await request(app)
+          .get(`/rooms/${room.code}/rounds`)
+          .query({ participantId });
+
+        expect(response.status).toBe(401);
+      },
+    );
+
+    /** The story is the one round fact no timestamp or tally could reconstruct afterwards. */
+    it('carries each round’s story, including the rounds nobody named', async () => {
+      const member = await seedUser(db);
+      const { room } = await playRoom(member, { name: 'Named rounds', votes: ['3', '3'] });
+      const [firstRound] = await listRounds(db, room.id);
+      await setRoundStory(db, (firstRound as { id: string }).id, '  Đăng nhập   bằng Google ');
+
+      const unnamed = await createRound(db, room.id);
+      expect(unnamed.story).toBeNull();
+
+      const response = await request(app)
+        .get(`/rooms/${room.code}/rounds`)
+        .set('Cookie', await signedInAs(member.id));
+
+      expect(
+        response.body.rounds.map((entry: { round: { story: string | null } }) => entry.round.story),
+      ).toEqual(['Đăng nhập bằng Google', null]);
     });
 
     it('404s an unknown room code before asking who is calling', async () => {

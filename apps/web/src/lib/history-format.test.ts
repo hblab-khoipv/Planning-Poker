@@ -13,6 +13,7 @@ function entry(overrides: Partial<RoundHistoryEntryDto> = {}): RoundHistoryEntry
       id: 'round-1',
       roundNumber: 1,
       status: 'revealed',
+      story: 'Đăng nhập bằng Google',
       createdAt: '2026-09-01T09:05:00.000Z',
       revealedAt: '2026-09-01T09:10:00.000Z',
     },

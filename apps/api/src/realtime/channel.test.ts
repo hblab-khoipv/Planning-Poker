@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   emitParticipantJoined,
   emitParticipantLeft,
+  emitRoundUpdated,
   emitVoteCast,
   type RealtimeServer,
   roomChannel,
@@ -79,5 +80,36 @@ describe('vote:cast', () => {
       participantId: PARTICIPANT.id,
       hasVoted: true,
     });
+  });
+});
+
+/**
+ * The story broadcast (migration 0007). It is the one round-carrying emitter with no vote fields
+ * at all, which is why a host may use it while the cards are still face down.
+ */
+describe('emitRoundUpdated', () => {
+  const ROUND = {
+    id: '44444444-4444-4444-8444-444444444444',
+    roundNumber: 2,
+    status: 'voting' as const,
+    story: 'Đăng nhập bằng Google',
+    createdAt: '2026-09-15T00:00:00.000Z',
+    revealedAt: null,
+  };
+
+  it('addresses the room channel and carries the round', () => {
+    const { io, to, emit } = fakeServer();
+    emitRoundUpdated(io, 'ABCD2345', { round: ROUND });
+
+    expect(to).toHaveBeenCalledWith('room:ABCD2345');
+    expect(emit).toHaveBeenCalledWith(SOCKET_EVENTS.ROUND_UPDATED, { round: ROUND });
+  });
+
+  it('cannot carry a card: the payload has no field for one', () => {
+    const { io, emit } = fakeServer();
+    emitRoundUpdated(io, 'ABCD2345', { round: ROUND });
+
+    expect(Object.keys(emit.mock.calls[0]?.[1] as object)).toEqual(['round']);
+    expect(JSON.stringify(emit.mock.calls[0])).not.toContain('votes');
   });
 });

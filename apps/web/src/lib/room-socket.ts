@@ -1,6 +1,7 @@
 import {
   type ActionAck,
   type ClientToServerEvents,
+  MAX_STORY_LENGTH,
   type ParticipantDto,
   type RevealedVoteDto,
   SOCKET_ERROR_CODES,
@@ -169,6 +170,17 @@ export function resetRound(socket: RoomSocket): Promise<ActionAck> {
   return requestAction(socket, (ack) => socket.emit(SOCKET_EVENTS.ROUND_RESET, ack));
 }
 
+/**
+ * Names the item the current round is estimating (migration 0007).
+ *
+ * Host-only on the server, which is why the room screen only shows the input to the host — but
+ * the refusal still comes back as an acknowledgement like every other action, so a stale "am I
+ * the host" cannot turn into a silently dropped edit.
+ */
+export function setRoundStory(socket: RoomSocket, story: string): Promise<ActionAck> {
+  return requestAction(socket, (ack) => socket.emit(SOCKET_EVENTS.ROUND_STORY, { story }, ack));
+}
+
 /** What a refused action should say, in words a Vietnamese-speaking user can act on. */
 export function messageForActionError(ack: ActionAck): string | null {
   if (ack.ok) return null;
@@ -183,6 +195,8 @@ export function messageForActionError(ack: ActionAck): string | null {
       return 'Bạn chưa vote ở round này nên không có bài để sửa.';
     case VOTE_ERROR_CODES.INVALID_CARD:
       return 'Thẻ này không thuộc bộ thẻ của phòng.';
+    case VOTE_ERROR_CODES.INVALID_STORY:
+      return `Tên story tối đa ${MAX_STORY_LENGTH} ký tự.`;
     case VOTE_ERROR_CODES.NO_ROUND:
       return 'Phòng chưa có round nào.';
     case VOTE_ERROR_CODES.RATE_LIMITED:

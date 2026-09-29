@@ -1,4 +1,4 @@
-import type { RoundStatus } from '@planning-poker/shared';
+import { normalizeStory, type RoundStatus } from '@planning-poker/shared';
 import { expectOne } from './users.js';
 import type { Queryable, VotingRound } from './types.js';
 
@@ -7,6 +7,7 @@ interface RoundRow {
   room_id: string;
   round_number: number;
   status: RoundStatus;
+  story: string | null;
   created_at: Date;
   revealed_at: Date | null;
 }
@@ -17,12 +18,13 @@ export function mapRound(row: RoundRow): VotingRound {
     roomId: row.room_id,
     roundNumber: row.round_number,
     status: row.status,
+    story: row.story,
     createdAt: row.created_at,
     revealedAt: row.revealed_at,
   };
 }
 
-const ROUND_COLUMNS = 'id, room_id, round_number, status, created_at, revealed_at';
+const ROUND_COLUMNS = 'id, room_id, round_number, status, story, created_at, revealed_at';
 
 /**
  * Opens the next round in a room. The round number is derived inside the INSERT rather than
@@ -125,6 +127,27 @@ export async function ensureCurrentRound(db: Queryable, roomId: string): Promise
   /* c8 ignore next */
   if (!raced) throw new Error('ensureCurrentRound: insert conflicted but no round exists');
   return raced;
+}
+
+/**
+ * Names (or clears) the item a round is estimating (migration 0007).
+ *
+ * Allowed at any status, unlike a vote: a story typed after the reveal is somebody writing down
+ * what the room just estimated, which is exactly the label the export needs. The value goes
+ * through the shared `normalizeStory`, which clips to the column's limit and turns a blank one
+ * into NULL — so neither a long title nor an empty one can reach Postgres as a failed CHECK.
+ */
+export async function setRoundStory(
+  db: Queryable,
+  roundId: string,
+  rawStory: string,
+): Promise<VotingRound | null> {
+  const { rows } = await db.query<RoundRow>(
+    `UPDATE voting_rounds SET story = $2 WHERE id = $1 RETURNING ${ROUND_COLUMNS}`,
+    [roundId, normalizeStory(rawStory)],
+  );
+  const row = rows[0];
+  return row ? mapRound(row) : null;
 }
 
 export async function listRounds(db: Queryable, roomId: string): Promise<VotingRound[]> {

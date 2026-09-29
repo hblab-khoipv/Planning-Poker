@@ -139,6 +139,18 @@ export function fetchMyRoomHistory(): Promise<RoomHistoryResponse> {
   return request<RoomHistoryResponse>('/users/me/rooms');
 }
 
-export function fetchRoomHistory(code: string): Promise<RoomHistoryDetailResponse> {
-  return request<RoomHistoryDetailResponse>(`/rooms/${encodeURIComponent(code)}/rounds`);
+/**
+ * One room's rounds. `participantId` is the seat this browser holds *in this room*
+ * (`lib/room-membership.ts`), sent so the in-room history panel works for a guest who has no
+ * account for the cookie to identify. The history screens omit it: they are FR-9's
+ * account-scoped archive, reached from a different browser session entirely.
+ */
+export function fetchRoomHistory(
+  code: string,
+  options: { participantId?: string | null } = {},
+): Promise<RoomHistoryDetailResponse> {
+  const query = options.participantId
+    ? `?participantId=${encodeURIComponent(options.participantId)}`
+    : '';
+  return request<RoomHistoryDetailResponse>(`/rooms/${encodeURIComponent(code)}/rounds${query}`);
 }
