@@ -130,7 +130,7 @@ export function RoomTable({
       ) : (
         <div
           data-testid="participant-list"
-          className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-auto rounded-2xl border border-line bg-surface px-3 py-3 lg:gap-3"
+          className="flex min-h-0 flex-1 flex-col items-center gap-2 overflow-auto [justify-content:safe_center] rounded-2xl border border-line bg-surface px-3 py-3 lg:gap-3"
         >
           {/* Every edge aligns its seats by the top of the card, so a seat that carries extra
               badges (the reader's own, a host's, an edited one) does not lift its card out of
@@ -234,7 +234,8 @@ function Seat({
             title={`Đã đổi từ ${edited.originalValue ?? '—'} sang ${edited.value}`}
             className="absolute -right-1.5 -top-1.5 rounded-full bg-warn px-1.5 py-0.5 text-[9px] font-bold text-white shadow"
           >
-            ✎
+            <span aria-hidden="true">✎</span>
+            <span className="sr-only">đã sửa</span>
           </span>
         ) : null}
 

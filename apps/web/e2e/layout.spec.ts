@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { createRoomViaApi } from './helpers/rooms';
+import { apiBaseUrl, createRoomViaApi } from './helpers/rooms';
 
 /**
  * The room screen has to fit a laptop without a page scroll — the captain's second ask, and the
@@ -53,6 +53,38 @@ test.describe('the room screen fits one laptop screen', () => {
       // The results panel is the state that used to push the deck off the bottom.
       expect(await verticalOverflow(page)).toBeLessThanOrEqual(1);
     });
+  }
+
+  // 8 is a full table; 30 is the crowd that overflows the seat list at both sizes.
+  for (const seats of [8, 30]) {
+    for (const viewport of DESKTOP) {
+      test(`${seats} seats keep the top row reachable at ${viewport.name}`, async ({
+        page,
+        request,
+      }) => {
+        const { room, participant } = await createRoomViaApi(request, {
+          displayName: 'Khôi (host)',
+        });
+        for (let i = 1; i < seats; i += 1) {
+          const joined = await request.post(`${apiBaseUrl()}/rooms/${room.code}/join`, {
+            data: { displayName: `Guest ${i}` },
+          });
+          expect(joined.ok()).toBe(true);
+        }
+        await page.setViewportSize({ width: viewport.width, height: viewport.height });
+        await seatHost(page, room.code, participant.id);
+        await expect(page.getByTestId('participant-item')).toHaveCount(seats);
+
+        // Centred overflow would push the top row above the list's scroll origin, out of reach.
+        const list = page.getByTestId('participant-list');
+        await list.evaluate((el) => el.scrollTo(0, 0));
+        const listBox = await list.boundingBox();
+        const topCard = await page.getByTestId('seat-card').first().boundingBox();
+        expect(listBox && topCard).toBeTruthy();
+        expect(topCard!.y).toBeGreaterThanOrEqual(listBox!.y);
+        expect(await verticalOverflow(page)).toBeLessThanOrEqual(1);
+      });
+    }
   }
 
   test('no sideways scroll on a phone', async ({ page, request }) => {
