@@ -374,6 +374,40 @@ describe('session history API', () => {
       expect(JSON.stringify(response.body)).not.toContain('"8"');
     });
 
+    /** Every seat id is public on `/participants`, so an account's seat proves nothing. */
+    it('refuses a cookie-less caller presenting an account-owned seat', async () => {
+      const member = await seedUser(db);
+      const { room, memberSeatId } = await playRoom(member, {
+        name: 'Borrowed seat',
+        votes: ['5', '8'],
+      });
+
+      const response = await request(app)
+        .get(`/rooms/${room.code}/rounds`)
+        .query({ participantId: memberSeatId });
+
+      expect(response.status).toBe(401);
+      expect(JSON.stringify(response.body)).not.toContain('"5"');
+      expect(JSON.stringify(response.body)).not.toContain('"8"');
+    });
+
+    it('does not widen the cookie path for a stranger presenting a guest seat', async () => {
+      const member = await seedUser(db);
+      const stranger = await seedUser(db);
+      const { room, guestSeatId } = await playRoom(member, {
+        name: 'Not yours',
+        votes: ['5', '8'],
+      });
+
+      const response = await request(app)
+        .get(`/rooms/${room.code}/rounds`)
+        .set('Cookie', await signedInAs(stranger.id))
+        .query({ participantId: guestSeatId });
+
+      expect(response.status).toBe(403);
+      expect(JSON.stringify(response.body)).not.toContain('"8"');
+    });
+
     it.each(['not-a-uuid', '99999999-9999-4999-8999-999999999999'])(
       'refuses the invented participant id %j',
       async (participantId) => {

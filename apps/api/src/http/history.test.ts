@@ -170,25 +170,30 @@ describe('canViewRoomHistory', () => {
   it('refuses a guest who presents no seat in this room', () => {
     expect(canViewRoomHistory({ callerUserId: null, isMember: true })).toBe(false);
     expect(canViewRoomHistory({ callerUserId: null, isMember: false })).toBe(false);
-    expect(canViewRoomHistory({ callerUserId: null, isMember: false, hasSeatInRoom: false })).toBe(
-      false,
-    );
+    expect(canViewRoomHistory({ callerUserId: null, isMember: false, seat: null })).toBe(false);
   });
 
   /**
    * The in-room panel and its export. The seat has already been looked up against *this* room,
-   * so it is the same credential the socket accepts — and that socket streams this room's
-   * revealed rounds live, so reading them back over REST grants nothing new.
+   * and a guest seat with no cookie is exactly what the socket handshake accepts — that socket
+   * streams this room's revealed rounds live, so reading them back over REST grants nothing new.
    */
-  it('lets a guest holding a seat in this very room read it', () => {
-    expect(canViewRoomHistory({ callerUserId: null, isMember: false, hasSeatInRoom: true })).toBe(
-      true,
-    );
+  it('lets a guest holding a guest seat in this very room read it', () => {
+    expect(
+      canViewRoomHistory({ callerUserId: null, isMember: false, seat: { userId: null } }),
+    ).toBe(true);
   });
 
-  it('lets a signed-in stranger through only on the strength of a seat they hold here', () => {
+  /** Seat ids are public on `/participants`, so an account's seat is not a credential. */
+  it('refuses a cookie-less caller presenting an account-owned seat', () => {
     expect(
-      canViewRoomHistory({ callerUserId: 'user-2', isMember: false, hasSeatInRoom: true }),
-    ).toBe(true);
+      canViewRoomHistory({ callerUserId: null, isMember: false, seat: { userId: 'user-1' } }),
+    ).toBe(false);
+  });
+
+  it('ignores a seat presented by a signed-in stranger, as the socket does', () => {
+    expect(
+      canViewRoomHistory({ callerUserId: 'user-2', isMember: false, seat: { userId: null } }),
+    ).toBe(false);
   });
 });

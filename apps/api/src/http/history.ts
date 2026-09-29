@@ -4,7 +4,7 @@ import type {
   RoundStateDto,
 } from '@planning-poker/shared';
 import type { RoomHistoryEntry, RoundWithVotes } from '../db/repositories/history.js';
-import type { Room } from '../db/repositories/index.js';
+import type { Participant, Room } from '../db/repositories/index.js';
 import { toRoomDto, toRoundStateDto } from './dto.js';
 
 /**
@@ -49,32 +49,44 @@ export function toRoundHistoryEntryDto(
 }
 
 /**
+ * Whether a presented seat id may stand in for the caller, the rule the socket handshake applies
+ * too (`realtime/identity.ts`): only for a caller with no session cookie, and only when the row
+ * is a guest seat, so nobody can borrow an account's seat by reading its id off `/participants`.
+ */
+export function isGuestSeatClaim(
+  callerUserId: string | null,
+  seat: Pick<Participant, 'userId'> | null,
+): boolean {
+  return callerUserId === null && seat !== null && seat.userId === null;
+}
+
+/**
  * Whether this caller may read one room's history.
  *
- * Two independent ways in, and matching either is enough:
+ * Two independent ways in, and the session cookie decides which one applies:
  *
- * - **An account with a seat in this room.** FR-9's own rule, unchanged: not "the room exists"
- *   and not "the caller is the host", so a signed-in stranger is refused. This is the one that
- *   works from the history screens, long after the meeting and from any browser.
- * - **A seat in this room, held right now.** The in-room history panel and its export, added for
- *   the round-history/export work. A guest is identified by the participant id their own browser
- *   stored when they joined (`lib/room-membership.ts`), which is the same credential the socket
- *   already accepts (`realtime/identity.ts`) — and that socket streams this room's revealed
- *   rounds live. Honouring it here therefore grants nothing new; refusing it would mean the
- *   primary MVP flow, a guest-hosted room, had a history panel nobody in the room could open.
+ * - **A signed-in account with a seat in this room.** FR-9's own rule, unchanged: not "the room
+ *   exists" and not "the caller is the host", so a signed-in stranger is refused. This is the one
+ *   that works from the history screens, long after the meeting and from any browser. A seat id
+ *   presented alongside the cookie is ignored, exactly as the socket handshake ignores it.
+ * - **No cookie, and a guest seat in this room.** The in-room history panel and its export, added
+ *   for the round-history/export work. A guest is identified by the participant id their own
+ *   browser stored when they joined (`lib/room-membership.ts`), which `isGuestSeatClaim` honours
+ *   on the same terms as the socket — and that socket streams this room's revealed rounds live.
+ *   Refusing it would mean the primary MVP flow, a guest-hosted room, had a history panel nobody
+ *   in the room could open.
  *
- * Still deliberately a pure predicate over booleans rather than a function that queries: the two
- * lookups belong to `isRoomMember` and `findParticipantInRoom`, and keeping the decision apart
- * from them is what lets every outcome be asserted directly. Compare `http/authority.ts`, which
- * answers the neighbouring question of who may *reveal*.
+ * Still deliberately a pure predicate over rows already fetched rather than a function that
+ * queries: the lookups belong to `isRoomMember` and `findParticipantInRoom`, and keeping the
+ * decision apart from them is what lets every outcome be asserted directly. Compare
+ * `http/authority.ts`, which answers the neighbouring question of who may *reveal*.
  */
 export function canViewRoomHistory(options: {
   callerUserId: string | null;
   isMember: boolean;
-  /** The caller presented a participant id that names a seat in this very room. */
-  hasSeatInRoom?: boolean;
+  /** The seat in this very room that the caller's presented participant id names, if any. */
+  seat?: Pick<Participant, 'userId'> | null;
 }): boolean {
-  if (options.hasSeatInRoom === true) return true;
-  if (options.callerUserId === null) return false;
+  if (options.callerUserId === null) return isGuestSeatClaim(null, options.seat ?? null);
   return options.isMember;
 }

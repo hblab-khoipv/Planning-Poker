@@ -84,6 +84,8 @@ export default function RoomPage() {
     votes: Map<string, RevealedVoteDto>;
     tally: RoundTally;
   } | null>(null);
+  // Bumped whenever the revealed cards are replaced, so the history panel refetches on an edit.
+  const [votesVersion, setVotesVersion] = useState(0);
   const [myVote, setMyVote] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   /**
@@ -173,6 +175,7 @@ export default function RoomPage() {
       setRevealed(
         payload.tally ? { votes: votesByParticipant(payload.votes), tally: payload.tally } : null,
       );
+      setVotesVersion((current) => current + 1);
     });
     socket.on(SOCKET_EVENTS.PARTICIPANT_JOINED, (payload: ParticipantJoinedPayload) => {
       setParticipants((current) => applyParticipantJoined(current, payload.participant));
@@ -199,6 +202,7 @@ export default function RoomPage() {
     socket.on(SOCKET_EVENTS.VOTE_EDITED, (payload: VoteEditedPayload) => {
       setRound(payload.round);
       setRevealed({ votes: votesByParticipant(payload.votes), tally: payload.tally });
+      setVotesVersion((current) => current + 1);
       if (payload.participantId === mySeatId) {
         const mine = payload.votes.find((vote) => vote.participantId === mySeatId);
         setMyVote(mine?.value ?? null);
@@ -489,7 +493,7 @@ export default function RoomPage() {
       <RoomHistoryPanel
         code={room.code}
         participantId={mySeatId}
-        refreshKey={`${round?.id ?? ''}:${round?.status ?? ''}:${round?.story ?? ''}`}
+        refreshKey={`${round?.id ?? ''}:${round?.status ?? ''}:${round?.story ?? ''}:${votesVersion}`}
       />
     </main>
   );

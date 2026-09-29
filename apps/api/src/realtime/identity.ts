@@ -11,6 +11,7 @@ import {
 } from '../db/repositories/participants.js';
 import { findRoomByCode } from '../db/repositories/rooms.js';
 import type { Participant, Queryable, Room } from '../db/repositories/types.js';
+import { isGuestSeatClaim } from '../http/history.js';
 import { resolveCallerFromCookieHeader } from '../http/session.js';
 
 /**
@@ -120,7 +121,7 @@ export async function resolveSocketParticipant(
       ? await lookup.findSeatById(room.id, claim.participantId)
       : null;
 
-  if (!participant || (!userId && participant.userId !== null)) {
+  if (!participant || (!userId && !isGuestSeatClaim(userId, participant))) {
     throw new SocketAuthError(
       SOCKET_ERROR_CODES.NOT_A_PARTICIPANT,
       'join the room before opening a realtime connection',

@@ -254,9 +254,10 @@ export function createRoomsRouter(pool: pg.Pool): Router {
    * `voting` when everyone went home therefore appears in the list with its votes withheld,
    * exactly as it would in the room itself. It is also what the in-room history panel and the
    * "Xuất tổng kết" export read, which is why `?participantId=` exists: the seat this browser
-   * holds *in this room*, exactly as the socket handshake presents it, so a guest in a
-   * guest-hosted room can open the panel of the room they are sitting in. `canViewRoomHistory`
-   * holds both rules; knowing a room code alone still gets you nothing.
+   * holds *in this room*, honoured only without a session cookie and only for a guest seat —
+   * the socket handshake's own rule — so a guest in a guest-hosted room can open the panel of
+   * the room they are sitting in. `canViewRoomHistory` holds both rules; a room code alone, or
+   * an account's seat id read off `/participants`, still gets you nothing.
    */
   router.get(
     '/:code/rounds',
@@ -267,14 +268,14 @@ export function createRoomsRouter(pool: pg.Pool): Router {
       const seatId = readOptionalString(req.query.participantId, 'participantId');
       const [isMember, seat] = await Promise.all([
         caller ? isRoomMember(pool, room.id, caller.userId) : Promise.resolve(false),
-        seatId ? findParticipantInRoom(pool, room.id, seatId) : Promise.resolve(null),
+        seatId && !caller ? findParticipantInRoom(pool, room.id, seatId) : Promise.resolve(null),
       ]);
 
       if (
         !canViewRoomHistory({
           callerUserId: caller?.userId ?? null,
           isMember,
-          hasSeatInRoom: seat !== null,
+          seat,
         })
       ) {
         // 401 and 403 answer different questions, and the history screen shows different things
