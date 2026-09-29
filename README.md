@@ -168,6 +168,8 @@ resolves to no seat is refused at the handshake, before it can join a channel
 | `round:reveal`       | client → server                     | Host-only; no payload                                              |
 | `round:revealed`     | server → room                       | Every vote's real value, plus average/median/consensus (FR-5/FR-6) |
 | `round:reset`        | client → server, then server → room | Host-only; broadcasts the new `voting_rounds` row (FR-7)           |
+| `reaction:throw`     | client → server                     | `emoji` from the shared palette, optional `targetParticipantId`    |
+| `reaction:thrown`    | server → room                       | Relayed throw; rate-limited per seat and never persisted           |
 
 Every broadcast this server can make goes through `apps/api/src/realtime/channel.ts`, and none of
 those functions has a parameter a vote value could arrive through before reveal — that is what
@@ -206,6 +208,7 @@ What bumps `last_active_at`, i.e. what counts as activity:
 
 Reads deliberately do not count: `GET /rooms/:code` and the participant list leave the clock
 alone, so a polling script or a forgotten dashboard cannot keep an abandoned room alive forever.
+Neither do thrown emoji (`reaction:throw`): cheering in an empty room is not activity.
 Tune the window with `ROOM_IDLE_HOURS` / `ROOM_CLEANUP_INTERVAL_MS` (see below).
 
 ## Database
