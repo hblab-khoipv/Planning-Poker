@@ -1,0 +1,5 @@
+﻿Round,Story,Trạng thái,Người tham gia,Lá bài,Bài ban đầu,Đã sửa,Trung bình,Median,Đồng thuận,Bắt đầu,Lộ bài
+1,Đăng nhập bằng Google,Đã lộ bài,Khôi (host),3,,,4,4,Không,2026-09-29T04:05:45.266Z,2026-09-29T04:05:45.719Z
+1,Đăng nhập bằng Google,Đã lộ bài,Lan,5,,,4,4,Không,2026-09-29T04:05:45.266Z,2026-09-29T04:05:45.719Z
+2,Xuất tổng kết phòng ra CSV,Đã lộ bài,Khôi (host),8,,,8,8,Có,2026-09-29T04:05:45.786Z,2026-09-29T04:05:45.904Z
+2,Xuất tổng kết phòng ra CSV,Đã lộ bài,Lan,8,,,8,8,Có,2026-09-29T04:05:45.786Z,2026-09-29T04:05:45.904Z
