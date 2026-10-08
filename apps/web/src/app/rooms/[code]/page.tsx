@@ -353,6 +353,43 @@ export default function RoomPage() {
     );
   }
 
+  /* FR-5/FR-7: host-only. The server refuses anybody else regardless, so hiding the buttons is
+     an affordance rather than the security boundary. They ride on the deck's heading line, in
+     the table frame, because that is where the round is now driven from. */
+  const hostControls = isHost ? (
+    <div className="flex shrink-0 flex-wrap gap-2" data-testid="host-controls">
+      {isRevealed ? (
+        <>
+          <button
+            type="button"
+            data-testid="revote-button"
+            onClick={onReset}
+            className="rounded-lg border border-line-strong px-3 py-1.5 text-sm font-semibold text-ink hover:border-brand"
+          >
+            Vote lại
+          </button>
+          <button
+            type="button"
+            data-testid="new-round-button"
+            onClick={onReset}
+            className="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand hover:bg-brand-strong"
+          >
+            Task tiếp theo / Round mới
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          data-testid="reveal-button"
+          onClick={onReveal}
+          className="rounded-lg bg-brand px-4 py-1.5 text-sm font-semibold text-on-brand hover:bg-brand-strong"
+        >
+          Lật bài
+        </button>
+      )}
+    </div>
+  ) : null;
+
   return (
     /**
      * One screen, no page scroll from `lg` up (1366×768 and 1440×900 both qualify): a fixed
@@ -420,8 +457,8 @@ export default function RoomPage() {
         </p>
       ) : null}
 
-      {/* The table gets every pixel left over; the results rail sits beside it once there are
-          results, so revealing a round never pushes the deck off the bottom of the screen. */}
+      {/* The table gets every pixel left over; the results rail beside it is reserved whether
+          or not there are results yet, so revealing a round does not resize the table frame. */}
       <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
         <div className="flex min-h-0 flex-1 flex-col">
           <RoomTable
@@ -434,22 +471,54 @@ export default function RoomPage() {
             isRevealed={isRevealed}
             reactions={reactions as LiveReaction[]}
             onEditVote={mySeatId && myVote !== null ? onStartEditingVote : undefined}
+            reactionTargetId={reactionTarget}
+            onSelectReactionTarget={mySeatId ? setReactionTarget : undefined}
+            // The hand sits at the table (captain 2026-10-08): the deck, its hint and the host's
+            // controls are one band inside the frame, below the seats.
+            footer={
+              mySeatId || isHost ? (
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  {mySeatId ? (
+                    <VoteDeck
+                      deckType={room.deckType}
+                      selected={myVote}
+                      // Locked once the cards are up — unless this browser asked to correct its
+                      // own card, which is issue #11's edit. The deck is the picker either way,
+                      // so there is no second card grid to keep in step with the first.
+                      disabled={isRevealed && !editingVote}
+                      editing={editingVote}
+                      onSelect={onSelectCard}
+                      actions={hostControls}
+                    />
+                  ) : (
+                    hostControls
+                  )}
+                </div>
+              ) : undefined
+            }
           />
         </div>
 
-        {revealed ? (
-          <aside className="min-h-0 w-full shrink-0 overflow-y-auto lg:w-[22rem]">
+        <aside className="min-h-0 w-full shrink-0 overflow-y-auto lg:w-[22rem]">
+          {revealed ? (
             <RoundResults
               participants={participants}
               votesByParticipant={revealed.votes}
               tally={revealed.tally}
               deckType={room.deckType}
             />
-          </aside>
-        ) : null}
+          ) : (
+            <div
+              data-testid="results-placeholder"
+              className="hidden h-full items-center justify-center rounded-2xl border border-dashed border-line px-4 text-center text-xs text-ink-subtle lg:flex"
+            >
+              Kết quả sẽ hiện ở đây sau khi host lật bài.
+            </div>
+          )}
+        </aside>
       </div>
 
-      <footer className="flex shrink-0 flex-wrap items-end justify-between gap-3 border-t border-line pt-2">
+      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line pt-2">
         {/* Collapsed by default. The key is what it watches: any of these changing means the
             history it is showing is now stale. */}
         <div className="w-full">
@@ -460,27 +529,11 @@ export default function RoomPage() {
           />
         </div>
 
-        {mySeatId ? (
-          <VoteDeck
-            deckType={room.deckType}
-            selected={myVote}
-            // Locked once the cards are up — unless this browser asked to correct its own card,
-            // which is issue #11's edit. The deck is the picker either way, so there is no second
-            // card grid to keep in step with the first.
-            disabled={isRevealed && !editingVote}
-            editing={editingVote}
-            onSelect={onSelectCard}
-          />
-        ) : (
-          <span />
-        )}
-
-        {/* Reactions work in every round state, so this sits outside the deck's
-            revealed/editing branching — the one thing in the room that is never locked. */}
+        {/* Reactions work in every round state — the one thing in the room that is never locked.
+            Who the next one is aimed at is picked by clicking a seat, not here. */}
         {mySeatId ? (
           <ReactionBar
             participants={participants}
-            currentParticipantId={mySeatId}
             targetParticipantId={reactionTarget}
             onChangeTarget={setReactionTarget}
             onThrow={onThrowReaction}
@@ -491,42 +544,6 @@ export default function RoomPage() {
           <p role="alert" data-testid="reaction-error" className="text-xs text-danger-ink">
             {reactionError}
           </p>
-        ) : null}
-
-        {/* FR-5/FR-7: host-only. The server refuses anybody else regardless, so hiding the
-            buttons is an affordance rather than the security boundary. */}
-        {isHost ? (
-          <div className="flex flex-wrap gap-2" data-testid="host-controls">
-            {isRevealed ? (
-              <>
-                <button
-                  type="button"
-                  data-testid="revote-button"
-                  onClick={onReset}
-                  className="rounded-lg border border-line-strong px-3 py-2 text-sm font-semibold text-ink hover:border-brand"
-                >
-                  Vote lại
-                </button>
-                <button
-                  type="button"
-                  data-testid="new-round-button"
-                  onClick={onReset}
-                  className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-on-brand hover:bg-brand-strong"
-                >
-                  Task tiếp theo / Round mới
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                data-testid="reveal-button"
-                onClick={onReveal}
-                className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-on-brand hover:bg-brand-strong"
-              >
-                Lật bài
-              </button>
-            )}
-          </div>
         ) : null}
       </footer>
     </main>
