@@ -30,8 +30,8 @@ export function RoundStory({
 
   if (!canEdit) {
     return (
-      <p data-testid="round-story" className="text-sm text-slate-300">
-        {story ?? <span className="text-slate-500">Chưa đặt tên story cho round này</span>}
+      <p data-testid="round-story" className="text-sm text-ink-muted">
+        {story ?? <span className="text-ink-subtle">Chưa đặt tên story cho round này</span>}
       </p>
     );
   }
@@ -54,7 +54,7 @@ export function RoundStory({
       onKeyDown={(event) => {
         if (event.key === 'Enter') event.currentTarget.blur();
       }}
-      className="w-full rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none"
+      className="w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-ink-subtle focus:border-brand focus:outline-none"
     />
   );
 }

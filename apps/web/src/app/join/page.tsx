@@ -11,7 +11,7 @@ export default function JoinPage() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 px-6 py-16">
       <header className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Vào phòng</h1>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-ink-muted">
           Nhập mã phòng host đã gửi cho bạn. Không cần tài khoản — chỉ cần một cái tên để mọi người
           trong phòng nhận ra bạn.
         </p>
@@ -19,9 +19,9 @@ export default function JoinPage() {
 
       <JoinByCodeForm />
 
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-ink-muted">
         Chưa có phòng nào?{' '}
-        <Link href="/rooms/new" className="font-medium text-indigo-400 hover:underline">
+        <Link href="/rooms/new" className="font-medium text-brand-ink hover:underline">
           Tạo phòng mới
         </Link>
       </p>

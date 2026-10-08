@@ -45,15 +45,15 @@ export default function HistoryPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-12">
       <header className="space-y-2">
-        <p className="text-sm uppercase tracking-widest text-indigo-400">Lịch sử</p>
+        <p className="text-sm uppercase tracking-widest text-brand-ink">Lịch sử</p>
         <h1 className="text-3xl font-bold tracking-tight">Phiên đã tham gia</h1>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-ink-muted">
           Các phòng bạn đã tạo hoặc tham gia, kèm kết quả những round đã lật bài.
         </p>
       </header>
 
       {status === 'loading' ? (
-        <p data-testid="history-loading" className="text-sm text-slate-400">
+        <p data-testid="history-loading" className="text-sm text-ink-muted">
           Đang tải…
         </p>
       ) : null}
@@ -61,16 +61,16 @@ export default function HistoryPage() {
       {status === 'unauthenticated' ? (
         <section
           data-testid="history-signed-out"
-          className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-5"
+          className="space-y-3 rounded-xl border border-line bg-surface p-5"
         >
           <h2 className="text-xl font-semibold">Cần đăng nhập</h2>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-ink-muted">
             Lịch sử phiên chỉ có cho tài khoản đã đăng nhập — phiên của khách không được lưu lại.
           </p>
           <Link
             href="/login"
             data-testid="history-login-link"
-            className="inline-block rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white hover:bg-indigo-400"
+            className="inline-block rounded-lg bg-brand px-4 py-2 font-semibold text-on-brand hover:bg-brand-strong"
           >
             Đăng nhập
           </Link>
@@ -78,7 +78,7 @@ export default function HistoryPage() {
       ) : null}
 
       {error ? (
-        <p role="alert" data-testid="history-error" className="text-sm text-rose-400">
+        <p role="alert" data-testid="history-error" className="text-sm text-danger-ink">
           {error}
         </p>
       ) : null}
@@ -87,7 +87,7 @@ export default function HistoryPage() {
         rooms.length === 0 ? (
           <p
             data-testid="history-empty"
-            className="rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-6 text-sm text-slate-400"
+            className="rounded-lg border border-line bg-surface px-4 py-6 text-sm text-ink-muted"
           >
             Bạn chưa tham gia phòng nào. Tạo một phòng và mời team vào để bắt đầu.
           </p>
@@ -99,22 +99,22 @@ export default function HistoryPage() {
                   href={roomHistoryPath(entry.room.code)}
                   data-testid="history-room"
                   data-room-code={entry.room.code}
-                  className="block space-y-2 rounded-xl border border-slate-800 bg-slate-900/60 p-5 hover:border-indigo-500"
+                  className="block space-y-2 rounded-xl border border-line bg-surface p-5 hover:border-brand"
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span data-testid="history-room-name" className="text-lg font-semibold">
                       {entry.room.name}
                     </span>
-                    <span className="font-mono text-xs text-slate-500">{entry.room.code}</span>
+                    <span className="font-mono text-xs text-ink-subtle">{entry.room.code}</span>
                   </div>
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-ink-muted">
                     <span data-testid="history-room-deck">{entry.room.deckType}</span> ·{' '}
                     <span data-testid="history-room-participants">
                       {entry.participantCount} người
                     </span>{' '}
                     · <span data-testid="history-room-rounds">{summarizeRounds(entry)}</span>
                   </p>
-                  <p className="text-xs text-slate-500" data-testid="history-room-revealed-at">
+                  <p className="text-xs text-ink-subtle" data-testid="history-room-revealed-at">
                     {entry.lastRevealedAt
                       ? `Lật bài gần nhất: ${formatTimestamp(entry.lastRevealedAt)}`
                       : 'Chưa có round nào được lật bài'}
@@ -127,7 +127,7 @@ export default function HistoryPage() {
       ) : null}
 
       <p className="text-sm">
-        <Link href="/" className="font-medium text-indigo-400 hover:underline">
+        <Link href="/" className="font-medium text-brand-ink hover:underline">
           ← Về trang chủ
         </Link>
       </p>

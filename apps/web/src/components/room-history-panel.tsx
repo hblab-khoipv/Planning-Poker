@@ -79,24 +79,28 @@ export function RoomHistoryPanel({
       data-testid="room-history-panel"
       open={open}
       onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
-      className="rounded-xl border border-slate-800 bg-slate-900/60"
+      className="rounded-xl border border-line bg-surface"
     >
       <summary
         data-testid="room-history-toggle"
-        className="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-slate-200 hover:text-indigo-300"
+        className="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-ink hover:text-brand-ink"
       >
         Lịch sử round &amp; xuất tổng kết
       </summary>
 
-      <div className="space-y-3 border-t border-slate-800 px-4 py-4">
+      <div className="space-y-3 border-t border-line px-4 py-4">
         {error ? (
-          <p role="alert" data-testid="room-history-panel-error" className="text-sm text-rose-400">
+          <p
+            role="alert"
+            data-testid="room-history-panel-error"
+            className="text-sm text-danger-ink"
+          >
             {error}
           </p>
         ) : null}
 
         {!error && !detail ? (
-          <p className="text-sm text-slate-400" data-testid="room-history-panel-loading">
+          <p className="text-sm text-ink-muted" data-testid="room-history-panel-loading">
             Đang tải lịch sử…
           </p>
         ) : null}
@@ -108,7 +112,7 @@ export function RoomHistoryPanel({
                 type="button"
                 data-testid="export-csv-button"
                 onClick={() => onExport('csv')}
-                className="rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-400"
+                className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-on-brand hover:bg-brand-strong"
               >
                 Tải CSV
               </button>
@@ -116,7 +120,7 @@ export function RoomHistoryPanel({
                 type="button"
                 data-testid="export-md-button"
                 onClick={() => onExport('md')}
-                className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-100 hover:border-indigo-500"
+                className="rounded-lg border border-line-strong px-3 py-1.5 text-xs font-semibold text-ink hover:border-brand"
               >
                 Tải Markdown
               </button>
@@ -124,20 +128,20 @@ export function RoomHistoryPanel({
                 type="button"
                 data-testid="copy-md-button"
                 onClick={onCopyMarkdown}
-                className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-100 hover:border-indigo-500"
+                className="rounded-lg border border-line-strong px-3 py-1.5 text-xs font-semibold text-ink hover:border-brand"
               >
                 Copy tổng kết
               </button>
             </div>
 
             {copied ? (
-              <p data-testid="export-copied" role="status" className="text-xs text-emerald-300">
+              <p data-testid="export-copied" role="status" className="text-xs text-ok-ink">
                 {copied}
               </p>
             ) : null}
 
             {rounds.length === 0 ? (
-              <p data-testid="room-history-panel-empty" className="text-sm text-slate-400">
+              <p data-testid="room-history-panel-empty" className="text-sm text-ink-muted">
                 Phòng này chưa có round nào.
               </p>
             ) : (
@@ -174,37 +178,37 @@ function RoundRow({
       data-testid="room-history-panel-round"
       data-round-number={entry.round.roundNumber}
       data-round-status={entry.round.status}
-      className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm"
+      className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm"
     >
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="font-semibold text-slate-100">#{entry.round.roundNumber}</span>
-        <span data-testid="panel-round-story" className="min-w-0 flex-1 truncate text-slate-300">
-          {entry.round.story ?? <span className="text-slate-500">Chưa đặt tên story</span>}
+        <span className="font-semibold text-ink">#{entry.round.roundNumber}</span>
+        <span data-testid="panel-round-story" className="min-w-0 flex-1 truncate text-ink-muted">
+          {entry.round.story ?? <span className="text-ink-subtle">Chưa đặt tên story</span>}
         </span>
-        <span className="text-xs text-slate-500">{formatTimestamp(stamp)}</span>
+        <span className="text-xs text-ink-subtle">{formatTimestamp(stamp)}</span>
       </div>
 
       {entry.tally === null ? (
-        <p data-testid="panel-round-hidden" className="mt-1 text-xs text-slate-500">
+        <p data-testid="panel-round-hidden" className="mt-1 text-xs text-ink-subtle">
           Chưa lật bài — các lá bài vẫn được giữ kín.
         </p>
       ) : (
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
           {entry.tally.average === null ? null : (
-            <span data-testid="panel-round-average" className="font-semibold text-indigo-300">
+            <span data-testid="panel-round-average" className="font-semibold text-brand-ink">
               TB {entry.tally.average}
             </span>
           )}
           {entry.tally.median === null ? null : (
-            <span className="text-slate-400">Median {entry.tally.median}</span>
+            <span className="text-ink-muted">Median {entry.tally.median}</span>
           )}
-          <span className="text-slate-400">{entry.tally.voteCount} vote</span>
+          <span className="text-ink-muted">{entry.tally.voteCount} vote</span>
           {entry.tally.consensus ? (
-            <span data-testid="panel-round-consensus" className="text-emerald-300">
+            <span data-testid="panel-round-consensus" className="text-ok-ink">
               🎉 Đồng thuận
             </span>
           ) : null}
-          <span className="min-w-0 basis-full truncate text-slate-500">
+          <span className="min-w-0 basis-full truncate text-ink-subtle">
             {entry.votes
               .map((vote) => `${names.get(vote.participantId) ?? '?'}: ${vote.value}`)
               .join(' · ')}

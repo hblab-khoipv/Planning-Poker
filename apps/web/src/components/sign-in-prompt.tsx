@@ -17,9 +17,9 @@ export function SignInPrompt() {
   if (!offersSignIn(identityState(status))) return null;
 
   return (
-    <p className="text-sm text-slate-400" data-testid="sign-in-prompt">
+    <p className="text-sm text-ink-muted" data-testid="sign-in-prompt">
       Muốn lưu lịch sử phiên?{' '}
-      <Link href="/login" className="font-medium text-indigo-400 hover:underline">
+      <Link href="/login" className="font-medium text-brand-ink hover:underline">
         Đăng nhập
       </Link>
     </p>

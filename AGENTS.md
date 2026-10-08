@@ -107,6 +107,23 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   `components/identity-section.tsx` (home), `components/sign-in-prompt.tsx` (the join screens) and
   `components/already-signed-in.tsx` (what `/login` and `/register` show instead of their form).
   Signing in stays optional (PRD §3.1.1) — this changes presentation only.
+- Colour in `apps/web` is never a raw Tailwind palette step: `src/app/globals.css` defines the
+  tokens (`--ink`, `--surface`, `--brand`, `--felt`, …) and `tailwind.config.ts` names them as
+  `text-ink-muted`, `bg-surface`, `border-line` and so on. Light is the default and the theme the
+  WCAG AA 4.5:1 contrast targets are checked against; the dark set is opt-in via `data-theme="dark"`
+  on `<html>` and deliberately NOT wired to `prefers-color-scheme` (issue #26). Theming is purely
+  CSS-variable swapping, so there is no Tailwind `darkMode` option and no `dark:` variant. Add a
+  colour by adding a token, never by reaching for `slate-800` again.
+- The room screen fits one laptop screen with no page scroll, and that is a tested contract:
+  `apps/web/e2e/layout.spec.ts` measures `scrollHeight - clientHeight` at 1366x768 and 1440x900 in
+  both the voting and revealed states. The mechanism is `lg:h-[100dvh] lg:overflow-hidden` on
+  `main` plus exactly one growing child (the table); the header (incl. the round-story editor) and
+  the footer band (deck, emoji bar, host controls — issue #31 — and the round-history panel) are
+  `shrink-0` and the results are a side rail, not another row. Below
+  `lg` it falls back to normal flow and scrolls. Anything added to that screen must go inside an
+  existing band or it will break the spec. The seat list scrolls inside the table and uses
+  `[justify-content:safe_center]`, never `justify-center`: plain centring puts a crowded room's top
+  row above the scroll origin, unreachable — the spec's 8-seat (post-reveal) and 30-seat cases guard it.
 - `apps/web`'s unit suite is `src/**/*.test.ts` in a _node_ environment: there is no React testing
   library here, so logic worth asserting belongs in `src/lib/` rather than inside a component.
 - Session history (FR-9) is account-only and says so structurally: `db/repositories/history.ts`

@@ -30,14 +30,14 @@ export function IdentitySection() {
               key={cta.id}
               href={cta.href}
               data-testid={cta.testId}
-              className="rounded-lg border border-slate-700 px-4 py-2 font-semibold text-slate-100 hover:bg-slate-800"
+              className="rounded-lg border border-line-strong px-4 py-2 font-semibold text-ink hover:bg-surface-2"
             >
               {cta.label}
             </Link>
           ))}
         </div>
       ) : null}
-      <p className="text-sm text-slate-400" data-testid="identity-note">
+      <p className="text-sm text-ink-muted" data-testid="identity-note">
         {identityNote(state)}
       </p>
     </section>

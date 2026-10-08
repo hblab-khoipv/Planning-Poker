@@ -19,32 +19,32 @@ export function AlreadySignedIn({ heading }: { heading: string }) {
   return (
     <section
       data-testid="already-signed-in"
-      className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-5"
+      className="space-y-3 rounded-xl border border-line bg-surface p-5"
     >
       <h2 className="text-xl font-semibold">{heading}</h2>
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-ink-muted">
         Bạn đang đăng nhập{who ? ' với ' : ''}
-        {who ? <strong className="text-slate-100">{who}</strong> : null}.
+        {who ? <strong className="text-ink">{who}</strong> : null}.
       </p>
       <div className="flex flex-wrap gap-3 text-sm">
         <Link
           href="/"
           data-testid="already-signed-in-home-link"
-          className="rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white hover:bg-indigo-400"
+          className="rounded-lg bg-brand px-4 py-2 font-semibold text-on-brand hover:bg-brand-strong"
         >
           Về trang chủ
         </Link>
         <Link
           href={HISTORY_CTA.href}
           data-testid={HISTORY_CTA.testId}
-          className="rounded-lg border border-slate-700 px-4 py-2 font-semibold text-slate-100 hover:bg-slate-800"
+          className="rounded-lg border border-line-strong px-4 py-2 font-semibold text-ink hover:bg-surface-2"
         >
           {HISTORY_CTA.label}
         </Link>
         <button
           type="button"
           onClick={() => void signOut({ callbackUrl: '/' })}
-          className="rounded-lg border border-slate-700 px-4 py-2 font-semibold text-slate-100 hover:bg-slate-800"
+          className="rounded-lg border border-line-strong px-4 py-2 font-semibold text-ink hover:bg-surface-2"
         >
           Đăng xuất
         </button>

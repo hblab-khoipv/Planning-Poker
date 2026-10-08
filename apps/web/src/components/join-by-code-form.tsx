@@ -39,12 +39,12 @@ export function JoinByCodeForm() {
             value={code}
             onChange={(event) => setCode(event.target.value)}
             data-testid="join-code-input"
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono uppercase tracking-widest text-slate-100 outline-none focus:border-indigo-400"
+            className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2 font-mono uppercase tracking-widest text-ink outline-none focus:border-brand"
           />
           <button
             type="submit"
             data-testid="join-code-submit"
-            className="shrink-0 rounded-lg border border-slate-700 px-4 py-2 font-semibold text-slate-100 hover:bg-slate-800"
+            className="shrink-0 rounded-lg border border-line-strong px-4 py-2 font-semibold text-ink hover:bg-surface-2"
           >
             Vào phòng
           </button>
@@ -52,7 +52,7 @@ export function JoinByCodeForm() {
       </div>
 
       {error ? (
-        <p role="alert" data-testid="join-code-error" className="text-sm text-rose-400">
+        <p role="alert" data-testid="join-code-error" className="text-sm text-danger-ink">
           {error}
         </p>
       ) : null}

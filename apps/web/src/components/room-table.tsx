@@ -39,20 +39,20 @@ const CONNECTION_LABEL: Record<Exclude<RoomTableConnection, 'none'>, string> = {
 };
 
 const CONNECTION_STYLE: Record<Exclude<RoomTableConnection, 'none'>, string> = {
-  connecting: 'bg-amber-500/20 text-amber-300',
-  live: 'bg-emerald-500/20 text-emerald-300',
-  offline: 'bg-rose-500/20 text-rose-300',
+  connecting: 'bg-warn/15 text-warn-ink',
+  live: 'bg-ok/10 text-ok-ink',
+  offline: 'bg-danger/10 text-danger-ink',
 };
 
 /** The face-down back of a played card — the woven pattern of the reference design. */
 const CARD_BACK =
-  'bg-[repeating-linear-gradient(45deg,theme(colors.indigo.400)_0px,theme(colors.indigo.400)_6px,theme(colors.indigo.300)_6px,theme(colors.indigo.300)_12px)]';
+  'bg-[repeating-linear-gradient(45deg,rgb(var(--brand))_0px,rgb(var(--brand))_6px,rgb(var(--brand-strong))_6px,rgb(var(--brand-strong))_12px)]';
 
 const CARD_STYLE: Record<SeatCardState, string> = {
-  waiting: 'border-slate-700 border-dashed bg-slate-800/60 text-slate-500',
-  voted: `border-indigo-300 text-white shadow-lg shadow-indigo-500/20 ${CARD_BACK}`,
-  revealed: 'border-slate-200 bg-slate-100 text-slate-900 shadow-lg shadow-slate-900/40',
-  'no-vote': 'border-slate-800 border-dashed bg-slate-900 text-slate-600',
+  waiting: 'border-line-strong border-dashed bg-surface-2 text-ink-subtle',
+  voted: `border-brand text-on-brand shadow-md shadow-brand/20 ${CARD_BACK}`,
+  revealed: 'border-brand bg-card-face text-card-face-ink shadow-md shadow-ink/10',
+  'no-vote': 'border-line border-dashed bg-surface text-ink-subtle',
 };
 
 export function RoomTable({
@@ -99,13 +99,17 @@ export function RoomTable({
   );
 
   return (
-    <section aria-labelledby="participants-heading" className="space-y-4">
+    <section
+      aria-labelledby="participants-heading"
+      className="flex min-h-0 flex-1 flex-col gap-2"
+      data-testid="room-table"
+    >
       <h2
         id="participants-heading"
-        className="flex flex-wrap items-center gap-2 text-xl font-semibold"
+        className="flex flex-wrap items-center gap-2 text-base font-semibold"
       >
         Bàn estimate{' '}
-        <span data-testid="participant-count" className="text-slate-400">
+        <span data-testid="participant-count" className="text-ink-muted">
           ({participants.length})
         </span>
         {connection === 'none' ? null : (
@@ -120,33 +124,35 @@ export function RoomTable({
       </h2>
 
       {participants.length === 0 ? (
-        <p className="text-sm text-slate-400" data-testid="participant-empty">
+        <p className="text-sm text-ink-muted" data-testid="participant-empty">
           Chưa có ai trong phòng.
         </p>
       ) : (
         <div
           data-testid="participant-list"
-          className="flex flex-col items-center gap-4 rounded-2xl border border-slate-800 bg-slate-950/40 px-4 py-6"
+          className="flex min-h-0 flex-1 flex-col items-center gap-2 overflow-auto [justify-content:safe_center] rounded-2xl border border-line bg-surface px-3 py-3 lg:gap-3"
         >
           {/* Every edge aligns its seats by the top of the card, so a seat that carries extra
               badges (the reader's own, a host's, an edited one) does not lift its card out of
               line with its neighbours'. */}
-          <div className="flex flex-wrap items-start justify-center gap-4">
+          <div className="flex flex-wrap items-start justify-center gap-2 lg:gap-3">
             {seating.top.map(seat)}
           </div>
 
-          <div className="flex w-full items-center justify-center gap-4">
-            <div className="flex flex-col items-center gap-4">{seating.left.map(seat)}</div>
+          <div className="flex w-full items-center justify-center gap-2 lg:gap-3">
+            <div className="flex flex-col items-center gap-2 lg:gap-3">
+              {seating.left.map(seat)}
+            </div>
 
             {/* The table itself. It carries the round's status so the middle of the screen
                 answers "what is the room doing right now?" without a legend. */}
             <div
               data-testid="table-surface"
               data-state={isRevealed ? 'revealed' : 'voting'}
-              className={`relative flex min-h-[9rem] w-full max-w-md items-center justify-center overflow-hidden rounded-[2.5rem] border-4 px-6 py-8 text-center text-sm font-semibold transition ${
+              className={`relative flex min-h-[4.5rem] w-full max-w-xs items-center justify-center overflow-hidden rounded-[2rem] border-4 px-4 py-4 text-center text-sm font-semibold transition lg:min-h-[6rem] ${
                 isRevealed
-                  ? 'border-emerald-900/60 bg-emerald-800/70 text-emerald-50'
-                  : 'border-slate-800 bg-slate-800/70 text-slate-300'
+                  ? 'border-ok/40 bg-felt text-felt-ink'
+                  : 'border-line bg-surface-2 text-ink-muted'
               }`}
             >
               <span data-testid="table-status">
@@ -155,10 +161,12 @@ export function RoomTable({
               <TableReactions reactions={tableReactions(reactions)} />
             </div>
 
-            <div className="flex flex-col items-center gap-4">{seating.right.map(seat)}</div>
+            <div className="flex flex-col items-center gap-2 lg:gap-3">
+              {seating.right.map(seat)}
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-start justify-center gap-4">
+          <div className="flex flex-wrap items-start justify-center gap-2 lg:gap-3">
             {seating.bottom.map(seat)}
           </div>
         </div>
@@ -208,14 +216,14 @@ function Seat({
       data-online={participant.isOnline ? 'true' : 'false'}
       data-voted={hasVoted ? 'true' : 'false'}
       data-card-state={state}
-      className={`flex w-28 flex-col items-center gap-1.5 ${participant.isOnline ? '' : 'opacity-50'}`}
+      className={`flex w-[4.5rem] flex-col items-center gap-1 lg:w-20 ${participant.isOnline ? '' : 'opacity-60'}`}
     >
       <div className="relative">
         <div
           data-testid="seat-card"
-          className={`flex h-24 w-16 items-center justify-center rounded-xl border-2 text-2xl font-bold transition ${
+          className={`flex h-14 w-10 items-center justify-center rounded-lg border-2 text-lg font-bold transition lg:h-[4.5rem] lg:w-12 lg:text-xl ${
             CARD_STYLE[state]
-          } ${isMe ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-950' : ''}`}
+          } ${isMe ? 'ring-2 ring-ok ring-offset-2 ring-offset-surface' : ''}`}
         >
           {face ?? ''}
         </div>
@@ -224,9 +232,10 @@ function Seat({
           <span
             data-testid="participant-vote-edited"
             title={`Đã đổi từ ${edited.originalValue ?? '—'} sang ${edited.value}`}
-            className="absolute -right-2 -top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-amber-950 shadow"
+            className="absolute -right-1.5 -top-1.5 rounded-full bg-warn px-1.5 py-0.5 text-[9px] font-bold text-on-warn shadow"
           >
-            ✎ đã sửa
+            <span aria-hidden="true">✎</span>
+            <span className="sr-only">đã sửa</span>
           </span>
         ) : null}
 
@@ -242,45 +251,45 @@ function Seat({
             {revealedVote.value}
           </span>
         ) : (
-          <span data-testid="participant-no-vote" className="text-[11px] text-slate-500">
+          <span data-testid="participant-no-vote" className="text-[11px] text-ink-subtle">
             Không vote
           </span>
         )
       ) : hasVoted ? (
-        <span data-testid="participant-voted" className="text-[11px] font-semibold text-indigo-300">
+        <span data-testid="participant-voted" className="text-[11px] font-semibold text-brand-ink">
           ✓ Đã chọn
         </span>
       ) : (
-        <span data-testid="participant-waiting" className="text-[11px] text-slate-500">
+        <span data-testid="participant-waiting" className="text-[11px] text-ink-subtle">
           Đang chọn…
         </span>
       )}
 
       {edited ? (
         <span
-          className="flex items-center gap-1 rounded bg-amber-400/10 px-1.5 py-0.5 font-mono text-xs text-amber-200"
+          className="flex items-center gap-1 rounded bg-warn/15 px-1.5 py-0.5 font-mono text-xs text-warn-ink"
           data-testid="participant-vote-change"
         >
-          <span className="text-slate-400 line-through">{edited.originalValue}</span>
+          <span className="text-ink-muted line-through">{edited.originalValue}</span>
           <span aria-hidden="true">→</span>
           <span className="font-bold">{edited.value}</span>
         </span>
       ) : null}
 
-      <span className="max-w-full truncate text-sm font-medium text-slate-100">
+      <span className="max-w-full truncate text-xs font-medium text-ink lg:text-sm">
         {participant.displayName}
       </span>
 
       <span className="flex flex-wrap items-center justify-center gap-1">
         {participant.isHost ? (
-          <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-300">
+          <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand-ink">
             Host
           </span>
         ) : null}
         {isMe ? (
           <span
             data-testid="participant-me"
-            className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300"
+            className="rounded bg-ok/10 px-1.5 py-0.5 text-[10px] font-semibold text-ok-ink"
           >
             Bạn
           </span>
@@ -288,7 +297,7 @@ function Seat({
         {participant.isOnline ? null : (
           <span
             data-testid="participant-offline"
-            className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400"
+            className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-muted"
           >
             Ngoại tuyến
           </span>
@@ -303,7 +312,7 @@ function Seat({
           type="button"
           data-testid="edit-vote-button"
           onClick={onEditVote}
-          className="rounded border border-slate-700 px-2 py-0.5 text-[11px] font-semibold text-slate-200 hover:border-indigo-400 hover:text-indigo-200"
+          className="rounded border border-line-strong px-2 py-0.5 text-[11px] font-semibold text-ink hover:border-brand hover:text-brand-ink"
         >
           ✎ Sửa bài
         </button>
