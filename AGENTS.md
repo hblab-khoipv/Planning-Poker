@@ -117,8 +117,9 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 - The room screen fits one laptop screen with no page scroll, and that is a tested contract:
   `apps/web/e2e/layout.spec.ts` measures `scrollHeight - clientHeight` at 1366x768 and 1440x900 in
   both the voting and revealed states. The mechanism is `lg:h-[100dvh] lg:overflow-hidden` on
-  `main` plus exactly one growing child (the table); header and the footer band (deck, emoji bar,
-  host controls — issue #31) are `shrink-0` and the results are a side rail, not another row. Below
+  `main` plus exactly one growing child (the table); the header (incl. the round-story editor) and
+  the footer band (deck, emoji bar, host controls — issue #31 — and the round-history panel) are
+  `shrink-0` and the results are a side rail, not another row. Below
   `lg` it falls back to normal flow and scrolls. Anything added to that screen must go inside an
   existing band or it will break the spec. The seat list scrolls inside the table and uses
   `[justify-content:safe_center]`, never `justify-center`: plain centring puts a crowded room's top
