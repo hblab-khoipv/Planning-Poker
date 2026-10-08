@@ -1,8 +1,5 @@
 # UI refresh — before / after
 
-Captured against the real app (Next.js + API + Postgres) at three viewports, with a four-person
-room so the table, deck, host controls and results all carry real data.
-
 - **before** = `origin/main` @ `13f33a6`
 - **after** = this branch
 
