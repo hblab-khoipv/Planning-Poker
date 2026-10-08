@@ -55,8 +55,15 @@ test.describe('the room screen fits one laptop screen', () => {
     });
   }
 
-  // 8 is a full table; 30 is the crowd that overflows the seat list at both sizes.
-  for (const seats of [8, 30]) {
+  /*
+   * 8 is a full table, measured after the reveal because that is when the host's "Sửa bài"
+   * button appears and the seat list is at its tallest — the realistic room that overflows by
+   * a hair. 30 is the crowd that overflows it outright at both sizes.
+   */
+  for (const { seats, reveal } of [
+    { seats: 8, reveal: true },
+    { seats: 30, reveal: false },
+  ]) {
     for (const viewport of DESKTOP) {
       test(`${seats} seats keep the top row reachable at ${viewport.name}`, async ({
         page,
@@ -74,6 +81,13 @@ test.describe('the room screen fits one laptop screen', () => {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
         await seatHost(page, room.code, participant.id);
         await expect(page.getByTestId('participant-item')).toHaveCount(seats);
+
+        if (reveal) {
+          await page.locator('[data-testid="vote-card"][data-value="5"]').click();
+          await page.getByTestId('reveal-button').click();
+          await expect(page.getByTestId('round-results')).toBeVisible();
+          await expect(page.getByTestId('edit-vote-button')).toBeVisible();
+        }
 
         // Centred overflow would push the top row above the list's scroll origin, out of reach.
         const list = page.getByTestId('participant-list');

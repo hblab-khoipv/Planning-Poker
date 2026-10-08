@@ -110,9 +110,9 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 - Colour in `apps/web` is never a raw Tailwind palette step: `src/app/globals.css` defines the
   tokens (`--ink`, `--surface`, `--brand`, `--felt`, …) and `tailwind.config.ts` names them as
   `text-ink-muted`, `bg-surface`, `border-line` and so on. Light is the default and the theme the
-  >=4.5:1 contrast targets are checked against; the dark set is opt-in via `data-theme="dark"` on
-  `<html>` and deliberately NOT wired to `prefers-color-scheme` (issue #26). Add a colour by adding
-  a token, never by reaching for `slate-800` again.
+  > =4.5:1 contrast targets are checked against; the dark set is opt-in via `data-theme="dark"` on
+  > `<html>` and deliberately NOT wired to `prefers-color-scheme` (issue #26). Add a colour by adding
+  > a token, never by reaching for `slate-800` again.
 - The room screen fits one laptop screen with no page scroll, and that is a tested contract:
   `apps/web/e2e/layout.spec.ts` measures `scrollHeight - clientHeight` at 1366x768 and 1440x900 in
   both the voting and revealed states. The mechanism is `lg:h-[100dvh] lg:overflow-hidden` on
