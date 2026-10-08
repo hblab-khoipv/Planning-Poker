@@ -14,6 +14,7 @@ const config: Config = {
         ink: { DEFAULT: token('ink'), muted: token('ink-muted'), subtle: token('ink-subtle') },
         brand: { DEFAULT: token('brand'), strong: token('brand-strong'), ink: token('brand-ink') },
         'on-brand': token('on-brand'),
+        'on-warn': token('on-warn'),
         ok: { DEFAULT: token('ok'), ink: token('ok-ink') },
         warn: { DEFAULT: token('warn'), ink: token('warn-ink') },
         danger: { DEFAULT: token('danger'), ink: token('danger-ink') },

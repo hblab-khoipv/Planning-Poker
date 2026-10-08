@@ -96,6 +96,7 @@
   --ok-ink: 4 108 78;
   --warn: 180 83 9;
   --warn-ink: 146 64 14;
+  --on-warn: 255 255 255; /* 5.0:1 on warn */
   --danger: 190 18 60;
   --danger-ink: 159 18 57;
 
@@ -125,6 +126,7 @@
   --ok-ink: 110 231 183;
   --warn: 217 119 6;
   --warn-ink: 252 211 77;
+  --on-warn: 16 24 40; /* 5.4:1 on the lighter dark-theme warn; white would be 3.2:1 */
   --danger: 225 29 72;
   --danger-ink: 253 164 175;
 

@@ -232,7 +232,7 @@ function Seat({
           <span
             data-testid="participant-vote-edited"
             title={`Đã đổi từ ${edited.originalValue ?? '—'} sang ${edited.value}`}
-            className="absolute -right-1.5 -top-1.5 rounded-full bg-warn px-1.5 py-0.5 text-[9px] font-bold text-white shadow"
+            className="absolute -right-1.5 -top-1.5 rounded-full bg-warn px-1.5 py-0.5 text-[9px] font-bold text-on-warn shadow"
           >
             <span aria-hidden="true">✎</span>
             <span className="sr-only">đã sửa</span>
