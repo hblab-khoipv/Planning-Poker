@@ -142,11 +142,12 @@ to tamper with, so the only account these routes can read is the one the session
 to. A guest gets 401 and a signed-in stranger 403 — different answers, because the screens show
 "đăng nhập để xem lịch sử" for one and "this session is not yours" for the other.
 
-`GET /rooms/:code/rounds` additionally accepts `?participantId=` — the seat this browser holds _in
-this room_, which is the same credential the socket handshake takes and which that socket already
-uses to stream the room's revealed rounds live. It is what lets the in-room history panel and its
-export work in a guest-hosted room, the primary MVP flow; a seat from another room, or an invented
-one, still gets 401 (`apps/api/src/http/history.ts`).
+`GET /rooms/:code/rounds` additionally accepts `?participantId=` — the guest seat this browser holds
+_in this room_, honoured on the socket handshake's terms: only without a session cookie, and only
+for a seat with no account behind it. That socket already streams the room's revealed rounds live,
+and it is what lets the in-room history panel and its export work in a guest-hosted room, the
+primary MVP flow. An account's seat, a seat from another room or an invented one still gets 401,
+and a signed-in caller's claim is ignored (`apps/api/src/http/history.ts`).
 
 ### Round history and export
 
