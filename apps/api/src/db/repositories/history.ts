@@ -122,6 +122,7 @@ interface RoundWithVotesRow {
   room_id: string;
   round_number: number;
   status: RoundStatus;
+  story: string | null;
   created_at: Date;
   revealed_at: Date | null;
   votes: VoteJson[] | null;
@@ -155,7 +156,7 @@ export async function listRoundsWithVotes(
   roomId: string,
 ): Promise<RoundWithVotes[]> {
   const { rows } = await db.query<RoundWithVotesRow>(
-    `SELECT v.id, v.room_id, v.round_number, v.status, v.created_at, v.revealed_at,
+    `SELECT v.id, v.room_id, v.round_number, v.status, v.story, v.created_at, v.revealed_at,
             COALESCE(
               (SELECT json_agg(vote ORDER BY vote.voted_at, vote.id)
                  FROM votes vote

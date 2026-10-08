@@ -1,6 +1,8 @@
 import {
   type ActionAck,
   type AckFn,
+  MAX_STORY_LENGTH,
+  type SetRoundStoryRequest,
   SOCKET_EVENTS,
   VOTE_ERROR_CODES,
   type VoteCastRequest,
@@ -23,6 +25,7 @@ import {
   type Queryable,
   type Room,
   revealRound,
+  setRoundStory,
   touchRoom,
   ValidationError,
   type VotingRound,
@@ -33,6 +36,7 @@ import { toRoundDto, toRoundStateDto } from '../http/dto.js';
 import {
   emitRoundReset,
   emitRoundRevealed,
+  emitRoundUpdated,
   emitVoteCast,
   emitVoteEdited,
   type RealtimeServer,
@@ -103,6 +107,27 @@ export function readVoteRequest(payload: unknown): string {
     throw new VoteActionError(VOTE_ERROR_CODES.INVALID_CARD, 'value is required');
   }
   return request.value;
+}
+
+/**
+ * Reads the story out of a `round:story` payload.
+ *
+ * Length is checked here rather than left to `normalizeStory`'s clip, because silently storing
+ * the first 120 characters of a title somebody typed is a worse answer than telling them it was
+ * too long. Whitespace-only is accepted: it is how the host clears a story they typed by mistake.
+ */
+export function readStoryRequest(payload: unknown): string {
+  const request = (payload ?? {}) as Partial<SetRoundStoryRequest>;
+  if (typeof request.story !== 'string') {
+    throw new VoteActionError(VOTE_ERROR_CODES.INVALID_STORY, 'story is required');
+  }
+  if (request.story.trim().length > MAX_STORY_LENGTH) {
+    throw new VoteActionError(
+      VOTE_ERROR_CODES.INVALID_STORY,
+      `tên story tối đa ${MAX_STORY_LENGTH} ký tự`,
+    );
+  }
+  return request.story;
 }
 
 /**
@@ -329,7 +354,37 @@ export async function handleRoundReset(
   emitRoundReset(io, room.code, { round: toRoundDto(round) });
 }
 
-/** Wires the four client→server actions onto one connected socket. */
+/**
+ * Names the item the current round is estimating (migration 0007).
+ *
+ * Host-only, like reveal and reset, and for the same reason: the story is the room's shared
+ * label for what it just agreed on, so it belongs to whoever is running the session rather than
+ * to whoever types fastest. See issue on the repo for that choice.
+ *
+ * Unlike a vote this is allowed at any status — a host who forgets to name the round until after
+ * the cards are up must still be able to, or the export loses the one fact it cannot recover.
+ * The broadcast carries the round and nothing else, so it cannot disturb votes in flight.
+ */
+export async function handleRoundStory(
+  pool: pg.Pool,
+  io: RealtimeServer,
+  context: { room: Room; participant: Participant },
+  payload: unknown,
+): Promise<void> {
+  const story = readStoryRequest(payload);
+  const room = await requireHost(pool, context.room.id, context.participant);
+
+  const current = await ensureCurrentRound(pool, room.id);
+  const updated = await setRoundStory(pool, current.id, story);
+  if (!updated) {
+    throw new VoteActionError(VOTE_ERROR_CODES.NO_ROUND, 'phòng chưa có round nào để đặt tên');
+  }
+
+  await touchRoom(pool, room.id);
+  emitRoundUpdated(io, room.code, { round: toRoundDto(updated) });
+}
+
+/** Wires the five client→server actions onto one connected socket. */
 export function registerVotingHandlers(
   io: RealtimeServer,
   pool: pg.Pool,
@@ -363,5 +418,9 @@ export function registerVotingHandlers(
 
   socket.on(SOCKET_EVENTS.ROUND_RESET, (ack?: AckFn) => {
     run(() => handleRoundReset(pool, io, context), ack);
+  });
+
+  socket.on(SOCKET_EVENTS.ROUND_STORY, (payload: unknown, ack?: AckFn) => {
+    run(() => handleRoundStory(pool, io, context, payload), ack);
   });
 }

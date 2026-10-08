@@ -1,6 +1,6 @@
 # UI refresh — before / after
 
-- **before** = `origin/main` @ `13f33a6`
+- **before** = `origin/main` @ `dc40b2a`
 - **after** = this branch
 
 Both sets come from the same four-person room (host + three guests who have voted), captured

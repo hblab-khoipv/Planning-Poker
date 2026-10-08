@@ -127,20 +127,48 @@ Screens: `/` (create or enter a code), `/rooms/new`, `/join` → `/join/[code]`,
 
 ## Session history
 
-FR-9 exists for accounts only. A guest is identified by a `participant_id` their own browser holds
-for one room, so there is nothing to attach a list of past sessions to — and honouring such an id
-would turn a leaked seat id into a key to that room's past votes. Both endpoints therefore resolve
-membership through `room_participants.user_id`, which no guest seat ever matches.
+FR-9's _archive_ — the list of your past sessions — exists for accounts only. A guest is identified
+by a `participant_id` their own browser holds for one room, so there is nothing to attach a list of
+past sessions to. `GET /users/me/rooms` therefore resolves membership through
+`room_participants.user_id`, which no guest seat ever matches.
 
-| Endpoint                  | Purpose                                                                |
-| ------------------------- | ---------------------------------------------------------------------- |
-| `GET /users/me/rooms`     | Rooms this account created or joined, newest activity first (FR-9)     |
-| `GET /rooms/:code/rounds` | One room's rounds and their results — members of that room only (FR-9) |
+| Endpoint                  | Purpose                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------ |
+| `GET /users/me/rooms`     | Rooms this account created or joined, newest activity first (FR-9)             |
+| `GET /rooms/:code/rounds` | One room's rounds and their results — an account that sat here, or a live seat |
 
 `/users/me/...` rather than `/users/:id/...` is the authorisation model: there is no id in the URL
 to tamper with, so the only account these routes can read is the one the session cookie decrypts
 to. A guest gets 401 and a signed-in stranger 403 — different answers, because the screens show
 "đăng nhập để xem lịch sử" for one and "this session is not yours" for the other.
+
+`GET /rooms/:code/rounds` additionally accepts `?participantId=` — the guest seat this browser holds
+_in this room_, honoured on the socket handshake's terms: only without a session cookie, and only
+for a seat with no account behind it. That socket already streams the room's revealed rounds live,
+and it is what lets the in-room history panel and its export work in a guest-hosted room, the
+primary MVP flow. An account's seat, a seat from another room or an invented one still gets 401,
+and a signed-in caller's claim is ignored (`apps/api/src/http/history.ts`).
+
+### Round history and export
+
+Each round carries an optional **story** (`voting_rounds.story`, migration 0007) — the item it
+estimated. Only the host sets it, over `round:story`, at any point in the round; PRD §11 keeps a
+real backlog out of the MVP, so this is one label per round and nothing more.
+
+The room screen has a collapsed **"Lịch sử round & xuất tổng kết"** panel listing every round with
+its story, average/median and consensus. Two exports, both generated in the browser from the very
+payload the history endpoint returned (`packages/shared/src/export.ts`):
+
+| Format   | Shape                                                                      |
+| -------- | -------------------------------------------------------------------------- |
+| CSV      | One row per vote (round, story, person, card, average, median, timestamps) |
+| Markdown | A readable per-round summary, to download or copy into a ticket            |
+
+There is deliberately no export endpoint: re-formatting a payload the server already decided to
+send cannot widen what the caller sees, whereas a second endpoint would be a second authorisation
+rule to keep in step. **Retention is the room's**: history is rows in `voting_rounds`/`votes`,
+which cascade from `rooms`, so the FR-10 idle sweep (24h, `ROOM_IDLE_HOURS`) expires a room's
+history at exactly the moment it expires the room.
 
 Round results are not recomputed for history: every entry goes through the same `toRoundStateDto`
 the live room uses, so a round still `voting` when everybody went home has its cards withheld here

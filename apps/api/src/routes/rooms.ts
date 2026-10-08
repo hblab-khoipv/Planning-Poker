@@ -252,10 +252,12 @@ export function createRoomsRouter(pool: pg.Pool): Router {
    * The same data the room computed live at reveal time (task 6), asked for after the fact —
    * and computed the same way, since each entry goes through `toRoundStateDto`. A round still
    * `voting` when everyone went home therefore appears in the list with its votes withheld,
-   * exactly as it would in the room itself.
-   *
-   * Membership is checked against `room_participants.user_id`, so knowing a room code is not
-   * enough: the invite link gets you into a room, not into its archive.
+   * exactly as it would in the room itself. It is also what the in-room history panel and the
+   * "Xuất tổng kết" export read, which is why `?participantId=` exists: the seat this browser
+   * holds *in this room*, honoured only without a session cookie and only for a guest seat —
+   * the socket handshake's own rule — so a guest in a guest-hosted room can open the panel of
+   * the room they are sitting in. `canViewRoomHistory` holds both rules; a room code alone, or
+   * an account's seat id read off `/participants`, still gets you nothing.
    */
   router.get(
     '/:code/rounds',
@@ -263,8 +265,19 @@ export function createRoomsRouter(pool: pg.Pool): Router {
       const caller = await resolveCaller(req);
       const room = await requireRoom(pool, req.params.code ?? '');
 
-      const isMember = caller ? await isRoomMember(pool, room.id, caller.userId) : false;
-      if (!canViewRoomHistory({ callerUserId: caller?.userId ?? null, isMember })) {
+      const seatId = readOptionalString(req.query.participantId, 'participantId');
+      const [isMember, seat] = await Promise.all([
+        caller ? isRoomMember(pool, room.id, caller.userId) : Promise.resolve(false),
+        seatId && !caller ? findParticipantInRoom(pool, room.id, seatId) : Promise.resolve(null),
+      ]);
+
+      if (
+        !canViewRoomHistory({
+          callerUserId: caller?.userId ?? null,
+          isMember,
+          seat,
+        })
+      ) {
         // 401 and 403 answer different questions, and the history screen shows different things
         // for them: "sign in" versus "this session is not one of yours".
         throw caller

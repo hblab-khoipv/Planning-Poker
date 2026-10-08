@@ -126,6 +126,7 @@ describe('toRoundStateDto', () => {
     roomId: 'room1',
     roundNumber: 2,
     status: 'voting' as const,
+    story: 'Đăng nhập bằng Google',
     createdAt: new Date('2026-09-15T00:00:00.000Z'),
     revealedAt: null,
   };

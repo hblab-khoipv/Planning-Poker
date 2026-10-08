@@ -7,6 +7,7 @@ import {
   findRoomByCode,
   ROOM_NAME_MAX_LENGTH,
 } from './rooms.js';
+import { setRoundStory } from './rounds.js';
 import { assertValidVoteValue, castVote, editRevealedVote } from './votes.js';
 import { ConflictError, isUniqueViolation, type Queryable, ValidationError } from './types.js';
 
@@ -439,5 +440,49 @@ describe('isUniqueViolation', () => {
     ['a string', 'nope'],
   ])('returns false for %s', (_label, error) => {
     expect(isUniqueViolation(error)).toBe(false);
+  });
+});
+
+/**
+ * Naming the item a round estimated (migration 0007). The column has a
+ * `char_length(btrim(...)) > 0` CHECK, so "the host cleared the box" has to arrive as NULL
+ * rather than as an empty string Postgres would reject.
+ */
+describe('setRoundStory', () => {
+  const ROUND_ROW = {
+    id: 'round-1',
+    room_id: 'room-1',
+    round_number: 2,
+    status: 'voting',
+    story: 'Đăng nhập bằng Google',
+    created_at: new Date('2026-09-14T00:00:00Z'),
+    revealed_at: null,
+  };
+
+  it('stores the normalised story and maps the row back', async () => {
+    const db = new FakeDb([{ rows: [ROUND_ROW] }]);
+    const round = await setRoundStory(db, 'round-1', '  Đăng nhập   bằng Google  ');
+
+    expect(db.lastCall.values).toEqual(['round-1', 'Đăng nhập bằng Google']);
+    expect(round).toMatchObject({ id: 'round-1', story: 'Đăng nhập bằng Google' });
+  });
+
+  it('sends NULL rather than an empty string when the host clears the name', async () => {
+    const db = new FakeDb([{ rows: [{ ...ROUND_ROW, story: null }] }]);
+    await setRoundStory(db, 'round-1', '   ');
+
+    expect(db.lastCall.values[1]).toBeNull();
+  });
+
+  it('clips a story the column could not hold', async () => {
+    const db = new FakeDb([{ rows: [ROUND_ROW] }]);
+    await setRoundStory(db, 'round-1', 'x'.repeat(500));
+
+    expect(db.lastCall.values[1]).toHaveLength(120);
+  });
+
+  it('returns null for a round that no longer exists', async () => {
+    const db = new FakeDb([{ rows: [] }]);
+    expect(await setRoundStory(db, 'round-gone', 'Story')).toBeNull();
   });
 });

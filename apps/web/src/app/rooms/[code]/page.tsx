@@ -15,6 +15,7 @@ import {
   type RoundResetPayload,
   type RoundRevealedPayload,
   type RoundTally,
+  type RoundUpdatedPayload,
   type VoteCastPayload,
   type VoteEditedPayload,
 } from '@planning-poker/shared';
@@ -23,8 +24,10 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { InviteLink } from '@/components/invite-link';
 import { ReactionBar } from '@/components/reaction-bar';
+import { RoomHistoryPanel } from '@/components/room-history-panel';
 import { RoomTable } from '@/components/room-table';
 import { RoundResults } from '@/components/round-results';
+import { RoundStory } from '@/components/round-story';
 import { VoteDeck } from '@/components/vote-deck';
 import { fetchParticipants, fetchRoom, messageForError } from '@/lib/api-client';
 import { browserIdentityStore } from '@/lib/guest-identity';
@@ -41,6 +44,7 @@ import {
   resetRound,
   revealRound,
   type RoomSocket,
+  setRoundStory,
   SOCKET_EVENTS,
   throwReaction,
   votesByParticipant,
@@ -80,6 +84,8 @@ export default function RoomPage() {
     votes: Map<string, RevealedVoteDto>;
     tally: RoundTally;
   } | null>(null);
+  // Bumped whenever the revealed cards are replaced, so the history panel refetches on an edit.
+  const [votesVersion, setVotesVersion] = useState(0);
   const [myVote, setMyVote] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   /**
@@ -169,6 +175,7 @@ export default function RoomPage() {
       setRevealed(
         payload.tally ? { votes: votesByParticipant(payload.votes), tally: payload.tally } : null,
       );
+      setVotesVersion((current) => current + 1);
     });
     socket.on(SOCKET_EVENTS.PARTICIPANT_JOINED, (payload: ParticipantJoinedPayload) => {
       setParticipants((current) => applyParticipantJoined(current, payload.participant));
@@ -195,6 +202,7 @@ export default function RoomPage() {
     socket.on(SOCKET_EVENTS.VOTE_EDITED, (payload: VoteEditedPayload) => {
       setRound(payload.round);
       setRevealed({ votes: votesByParticipant(payload.votes), tally: payload.tally });
+      setVotesVersion((current) => current + 1);
       if (payload.participantId === mySeatId) {
         const mine = payload.votes.find((vote) => vote.participantId === mySeatId);
         setMyVote(mine?.value ?? null);
@@ -208,6 +216,11 @@ export default function RoomPage() {
       setReactions((current) =>
         applyReactionThrown(current, { ...payload, thrownAt: Date.now() }, Date.now()),
       );
+    });
+
+    // Only the round's own fields moved (its story), so nothing about the votes is touched.
+    socket.on(SOCKET_EVENTS.ROUND_UPDATED, (payload: RoundUpdatedPayload) => {
+      setRound(payload.round);
     });
 
     // A reset clears every trace of the previous round, this browser's own card included.
@@ -308,6 +321,11 @@ export default function RoomPage() {
     [reactionTarget],
   );
 
+  const onSetStory = useCallback(
+    (story: string) => void runAction((socket) => setRoundStory(socket, story)),
+    [runAction],
+  );
+
   const onReveal = useCallback(() => void runAction(revealRound), [runAction]);
   const onReset = useCallback(() => void runAction(resetRound), [runAction]);
 
@@ -370,6 +388,11 @@ export default function RoomPage() {
             </>
           ) : null}
         </p>
+        {round ? (
+          <div className="min-w-0 flex-1 basis-56">
+            <RoundStory story={round.story} canEdit={isHost} onSubmit={onSetStory} />
+          </div>
+        ) : null}
         <div className="ml-auto flex min-w-0 max-w-xs flex-1 basis-64 items-center">
           <InviteLink code={room.code} />
         </div>
@@ -427,6 +450,16 @@ export default function RoomPage() {
       </div>
 
       <footer className="flex shrink-0 flex-wrap items-end justify-between gap-3 border-t border-line pt-2">
+        {/* Collapsed by default. The key is what it watches: any of these changing means the
+            history it is showing is now stale. */}
+        <div className="w-full">
+          <RoomHistoryPanel
+            code={room.code}
+            participantId={mySeatId}
+            refreshKey={`${round?.id ?? ''}:${round?.status ?? ''}:${round?.story ?? ''}:${votesVersion}`}
+          />
+        </div>
+
         {mySeatId ? (
           <VoteDeck
             deckType={room.deckType}

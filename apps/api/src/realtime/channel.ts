@@ -4,6 +4,7 @@ import {
   type ReactionThrownPayload,
   type RoundRevealedPayload,
   type RoundResetPayload,
+  type RoundUpdatedPayload,
   SOCKET_EVENTS,
   type ServerToClientEvents,
   type VoteCastPayload,
@@ -118,4 +119,18 @@ export function emitReactionThrown(
   payload: ReactionThrownPayload,
 ): void {
   io.to(roomChannel(roomCode)).emit(SOCKET_EVENTS.REACTION_THROWN, payload);
+}
+
+/**
+ * The round itself changed — today, the host named the story it is estimating (migration 0007).
+ *
+ * The third emitter carrying a round, and the only one that carries no votes at all: the payload
+ * has no field a card could travel in, so naming a story mid-vote cannot leak one.
+ */
+export function emitRoundUpdated(
+  io: RealtimeServer,
+  roomCode: string,
+  payload: RoundUpdatedPayload,
+): void {
+  io.to(roomChannel(roomCode)).emit(SOCKET_EVENTS.ROUND_UPDATED, payload);
 }

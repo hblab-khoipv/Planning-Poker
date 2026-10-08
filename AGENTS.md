@@ -173,6 +173,17 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   touches no round: nothing is persisted, `touchRoom` is deliberately not called (cheering must
   not keep an idle room alive), and the palette + rate limit live in `packages/shared`'s
   `reactions.ts` so the buttons a browser renders are exactly what the server accepts.
+- A room's score history is not a second store: it _is_ `voting_rounds` + `votes`, which 0002
+  cascades from `rooms`, so the FR-10 sweep is also its retention (≤ 24h) with nothing extra to
+  configure. `voting_rounds.story` (migration 0007, host-only `round:story` → `round:updated`) is
+  the one round fact nothing else could reconstruct afterwards. One endpoint serves both readers:
+  `GET /rooms/:code/rounds` answers FR-9's account-scoped screens _and_ the in-room panel, the
+  latter via `?participantId=` — the same seat credential the socket handshake takes, so
+  `canViewRoomHistory` grants a guest nothing the live socket had not already streamed them.
+- Export is browser-side by design: `packages/shared/src/export.ts` turns the history payload the
+  server already sent into CSV/Markdown, so there is no export endpoint whose authorisation could
+  drift from the history one, and no chance of a number the room never saw. Keep the formatters
+  pure and in `shared`; `apps/web/src/lib/room-export.ts` is only the Blob/clipboard plumbing.
 - Integration tests get fixtures from `apps/api/tests/helpers/seed.ts` (`seedRoomWithRound`,
   `truncateAll`); they build rows through the real repositories, so use them rather than raw INSERTs.
 
