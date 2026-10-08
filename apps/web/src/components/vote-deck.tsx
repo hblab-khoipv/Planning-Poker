@@ -1,6 +1,7 @@
 'use client';
 
 import { DECKS, type DeckType } from '@planning-poker/shared';
+import type { ReactNode } from 'react';
 
 /**
  * The room's cards (PRD §9.4, FR-4).
@@ -18,6 +19,7 @@ export function VoteDeck({
   selected,
   disabled = false,
   editing = false,
+  actions,
   onSelect,
 }: {
   deckType: DeckType;
@@ -31,13 +33,24 @@ export function VoteDeck({
    * is what keeps it from feeling like an ordinary, private vote.
    */
   editing?: boolean;
+  /**
+   * The host's round controls, on the deck's own heading line.
+   *
+   * They share a row rather than sitting beside the cards because the deck now lives inside the
+   * table frame (captain 2026-10-08): a row of nine cards plus two buttons does not fit the
+   * frame's width, and anything that wraps there eats the seats' height.
+   */
+  actions?: ReactNode;
   onSelect: (value: string) => void;
 }) {
   return (
     <section aria-labelledby="deck-heading" className="space-y-2">
-      <h2 id="deck-heading" className="text-sm font-semibold">
-        {editing ? 'Chọn thẻ mới — cả phòng sẽ thấy bạn đã sửa' : 'Chọn thẻ của bạn'}
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="deck-heading" className="text-sm font-semibold">
+          {editing ? 'Chọn thẻ mới — cả phòng sẽ thấy bạn đã sửa' : 'Chọn thẻ của bạn'}
+        </h2>
+        {actions}
+      </div>
 
       <ul data-testid="vote-deck" className="flex flex-wrap gap-1.5">
         {DECKS[deckType].map((value) => {

@@ -5,10 +5,13 @@ import { type ParticipantDto, REACTION_OPTIONS } from '@planning-poker/shared';
 /**
  * The emoji palette: one compact row, on purpose.
  *
- * It sits below the deck and takes a single line, because another screen's worth of chrome is
- * exactly what a room that has to fit on one screen cannot afford. Picking a target is a select
- * rather than a second grid of avatars for the same reason — and because a select is reachable
- * by keyboard, which clicking a seat would not be.
+ * It sits in the footer band and takes a single line, because another screen's worth of chrome is
+ * exactly what a room that has to fit on one screen cannot afford.
+ *
+ * Who the emoji is aimed at is *not* chosen here (captain 2026-10-08): you click the person at
+ * the table, which is where they are. All this bar keeps is the way back — "Cả bàn" — and a
+ * readout of the current target, so nobody can throw a tomato at somebody without the screen
+ * having said so first.
  *
  * The palette rendered is `@planning-poker/shared`'s, the same list the server accepts, so the
  * UI cannot offer an emoji that would be refused. Each button carries its Vietnamese label as
@@ -16,23 +19,20 @@ import { type ParticipantDto, REACTION_OPTIONS } from '@planning-poker/shared';
  */
 export function ReactionBar({
   participants,
-  currentParticipantId,
   targetParticipantId,
   onChangeTarget,
   onThrow,
   disabled = false,
 }: {
   participants: ParticipantDto[];
-  currentParticipantId: string | null;
   /** null means the table. */
   targetParticipantId: string | null;
   onChangeTarget: (participantId: string | null) => void;
   onThrow: (emoji: string) => void;
   disabled?: boolean;
 }) {
-  const others = participants.filter((participant) => participant.id !== currentParticipantId);
   const targetName =
-    others.find((participant) => participant.id === targetParticipantId)?.displayName ?? null;
+    participants.find((participant) => participant.id === targetParticipantId)?.displayName ?? null;
 
   return (
     <section
@@ -44,23 +44,30 @@ export function ReactionBar({
         Ném emoji
       </h2>
 
-      <label className="flex items-center gap-1 text-xs text-ink-subtle">
-        <span className="sr-only">Ném vào</span>
-        <select
-          data-testid="reaction-target"
-          value={targetParticipantId ?? ''}
-          disabled={disabled}
-          onChange={(event) => onChangeTarget(event.target.value || null)}
-          className="rounded border border-line-strong bg-surface px-2 py-1 text-xs text-ink disabled:opacity-40"
-        >
-          <option value="">Cả bàn</option>
-          {others.map((participant) => (
-            <option key={participant.id} value={participant.id}>
-              {participant.displayName}
-            </option>
-          ))}
-        </select>
-      </label>
+      <button
+        type="button"
+        data-testid="reaction-target-all"
+        aria-pressed={targetParticipantId === null}
+        disabled={disabled}
+        onClick={() => onChangeTarget(null)}
+        className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition disabled:opacity-40 ${
+          targetParticipantId === null
+            ? 'border-brand bg-brand text-on-brand'
+            : 'border-line-strong bg-surface text-ink hover:border-brand'
+        }`}
+      >
+        Cả bàn
+      </button>
+
+      <p data-testid="reaction-target-label" className="text-xs text-ink-subtle">
+        {targetName ? (
+          <>
+            Đang ném vào <span className="font-semibold text-warn-ink">{targetName}</span>
+          </>
+        ) : (
+          'Bấm vào một người ở bàn để ném riêng'
+        )}
+      </p>
 
       <ul className="flex flex-wrap items-center gap-1">
         {REACTION_OPTIONS.map((option) => (

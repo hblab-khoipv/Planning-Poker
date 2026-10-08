@@ -118,12 +118,19 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   `apps/web/e2e/layout.spec.ts` measures `scrollHeight - clientHeight` at 1366x768 and 1440x900 in
   both the voting and revealed states. The mechanism is `lg:h-[100dvh] lg:overflow-hidden` on
   `main` plus exactly one growing child (the table); the header (incl. the round-story editor) and
-  the footer band (deck, emoji bar, host controls — issue #31 — and the round-history panel) are
-  `shrink-0` and the results are a side rail, not another row. Below
+  the footer band (emoji bar and the round-history panel) are `shrink-0`, and the results are a
+  side rail, not another row — a rail whose width is **reserved whether or not a round is
+  revealed**, which is what keeps the "Bàn estimate" frame one fixed size through a reveal. Below
   `lg` it falls back to normal flow and scrolls. Anything added to that screen must go inside an
-  existing band or it will break the spec. The seat list scrolls inside the table and uses
+  existing band or it will break the spec. The deck, its hint and the host's round controls live
+  _inside_ that frame below the seats (`RoomTable`'s `footer` prop; the controls ride on the
+  deck's heading line because a row of nine cards plus two buttons does not fit the frame).
+  The seat list scrolls inside the table and uses
   `[justify-content:safe_center]`, never `justify-center`: plain centring puts a crowded room's top
   row above the scroll origin, unreachable — the spec's 8-seat (post-reveal) and 30-seat cases guard it.
+  Sharp edge: every seat is `relative`, because Tailwind's `.sr-only` is `position: absolute` and a
+  span whose containing block sits outside the scrolling seat list escapes that list's clipping and
+  silently makes the whole page scroll by a few pixels.
 - `apps/web`'s unit suite is `src/**/*.test.ts` in a _node_ environment: there is no React testing
   library here, so logic worth asserting belongs in `src/lib/` rather than inside a component.
 - Session history (FR-9) is account-only and says so structurally: `db/repositories/history.ts`
@@ -170,6 +177,10 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   and CI — means NextAuth's defaults, unchanged.
 - `NEXT_PUBLIC_API_URL` is baked into the browser bundle by `next build`, so changing it needs a
   rebuild, not a restart; it is set in the deploy workflow's build job as well as in `web.env`.
+- Who a thrown emoji is aimed at is picked by **clicking the person's seat** (`seat-target`, a real
+  button with `aria-pressed`, click again or "Cả bàn" to go back to the table) — the emoji bar only
+  keeps the way back and the readout. A seat-bound emoji lands _on the card_ (`reaction-land` in
+  `globals.css`): any landing spot above the card is clipped away by the seat list's scrollbox.
 - Thrown emoji (`realtime/reactions.ts` + `web/src/lib/reactions.ts`) are the one feature that
   touches no round: nothing is persisted, `touchRoom` is deliberately not called (cheering must
   not keep an idle room alive), and the palette + rate limit live in `packages/shared`'s

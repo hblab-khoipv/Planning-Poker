@@ -21,20 +21,26 @@
     }
   }
 
+  /*
+   * Thrown at a person: it flies in from below and comes to rest **on their card**, not above it
+   * (captain 2026-10-08). Landing on the card is what makes the target unmistakable, and it is
+   * also the only landing spot that stays inside the seat list's own scroll box — an emoji that
+   * settled above the seat was being clipped off whenever the target sat on the top row.
+   */
   @keyframes reaction-land {
     0% {
       opacity: 0;
-      transform: translate(-50%, 5rem) scale(2.4) rotate(-25deg);
+      transform: translate(-50%, 4rem) scale(2.2) rotate(-25deg);
     }
-    40% {
+    35% {
       opacity: 1;
     }
     70% {
-      transform: translate(-50%, -2.25rem) scale(1.1) rotate(0deg);
+      transform: translate(-50%, 0.6rem) scale(1.15) rotate(0deg);
     }
     100% {
       opacity: 0;
-      transform: translate(-50%, -3.25rem) scale(1) rotate(0deg);
+      transform: translate(-50%, 1.1rem) scale(1) rotate(0deg);
     }
   }
 
@@ -58,10 +64,14 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .animate-reaction-float,
-    .animate-reaction-land {
+    .animate-reaction-float {
       animation-name: reaction-still;
       transform: translate(-50%, -2.5rem);
+    }
+
+    .animate-reaction-land {
+      animation-name: reaction-still;
+      transform: translate(-50%, 1rem);
     }
   }
 }

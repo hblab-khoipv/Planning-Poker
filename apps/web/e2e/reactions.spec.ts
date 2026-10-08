@@ -59,7 +59,8 @@ test.describe('throwing emoji in the room', () => {
     await expect(emoji(page, '🎉')).toHaveCount(0, { timeout: 6000 });
 
     // --- thrown at a seat: it lands on that person's seat, on both screens ---------------
-    await lan.getByTestId('reaction-target').selectOption({ label: 'Khôi (host)' });
+    // The target is the person, clicked at the table (captain 2026-10-08), not a dropdown.
+    await seat(lan, 'Khôi (host)').getByTestId('seat-target').click();
     await lan.locator('[data-testid="reaction-button"][data-emoji="🍅"]').click();
 
     for (const view of [page, lan]) {
