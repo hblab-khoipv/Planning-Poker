@@ -62,6 +62,7 @@ export function toRoundDto(round: VotingRound): RoundDto {
     id: round.id,
     roundNumber: round.roundNumber,
     status: round.status,
+    story: round.story,
     createdAt: round.createdAt.toISOString(),
     revealedAt: round.revealedAt?.toISOString() ?? null,
   };

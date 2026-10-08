@@ -1,4 +1,4 @@
-import { VOTE_ERROR_CODES } from '@planning-poker/shared';
+import { MAX_STORY_LENGTH, VOTE_ERROR_CODES } from '@planning-poker/shared';
 import type pg from 'pg';
 import { describe, expect, it } from 'vitest';
 import type { Participant, Queryable } from '../db/repositories/index.js';
@@ -7,6 +7,7 @@ import {
   ackFor,
   ackOk,
   handleVoteEdit,
+  readStoryRequest,
   readVoteRequest,
   requireHost,
   requireOpenRound,
@@ -61,6 +62,7 @@ function roundRow(status: 'voting' | 'revealed') {
     room_id: ROOM_ID,
     round_number: 1,
     status,
+    story: null,
     created_at: new Date('2026-09-15T00:00:00.000Z'),
     revealed_at: status === 'revealed' ? new Date('2026-09-15T00:01:00.000Z') : null,
   };
@@ -106,6 +108,46 @@ describe('readVoteRequest', () => {
   it('does not judge the card itself — that is the deck check in the data layer', () => {
     // Off-deck values are rejected by `assertValidVoteValue`, which knows the room's deck.
     expect(readVoteRequest({ value: 'not-a-card' })).toBe('not-a-card');
+  });
+});
+
+describe('readStoryRequest', () => {
+  it('takes the story out of a well-formed payload', () => {
+    expect(readStoryRequest({ story: 'Đăng nhập bằng Google' })).toBe('Đăng nhập bằng Google');
+  });
+
+  /** Blank is how the host clears a story they typed by mistake, so it is not a refusal. */
+  it('accepts a blank story as "clear the name"', () => {
+    expect(readStoryRequest({ story: '   ' })).toBe('   ');
+  });
+
+  it.each([undefined, null, {}, { story: 7 }, 'a string'])(
+    'refuses the malformed payload %j',
+    (payload) => {
+      expect(() => readStoryRequest(payload)).toThrow(VoteActionError);
+      expect(() => readStoryRequest(payload)).toThrow(/story is required/);
+    },
+  );
+
+  /**
+   * Rejected rather than clipped: `normalizeStory` would happily store the first 120 characters,
+   * and silently truncating a title somebody typed is a worse answer than saying it is too long.
+   */
+  it('refuses a story longer than the column allows', () => {
+    const tooLong = { story: 'x'.repeat(MAX_STORY_LENGTH + 1) };
+
+    expect(() => readStoryRequest(tooLong)).toThrow(VoteActionError);
+    try {
+      readStoryRequest(tooLong);
+    } catch (error) {
+      expect((error as VoteActionError).code).toBe(VOTE_ERROR_CODES.INVALID_STORY);
+    }
+  });
+
+  it('measures the trimmed story, so trailing spaces do not push it over', () => {
+    expect(readStoryRequest({ story: `${'x'.repeat(MAX_STORY_LENGTH)}    ` })).toHaveLength(
+      MAX_STORY_LENGTH + 4,
+    );
   });
 });
 

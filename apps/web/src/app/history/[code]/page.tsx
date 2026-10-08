@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { RoundResults } from '@/components/round-results';
 import { fetchRoomHistory, messageForError } from '@/lib/api-client';
 import { formatTimestamp, hasResults, votesByParticipantId } from '@/lib/history-format';
+import { type ExportFormat, downloadFile, roomSummaryFile } from '@/lib/room-export';
 
 /**
  * One room's past rounds — the click-through from PRD §9.6's list.
@@ -27,6 +28,11 @@ export default function RoomHistoryPage() {
 
   const [detail, setDetail] = useState<RoomHistoryDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  /** The same file the in-room panel offers, from the same payload and the same formatters. */
+  const onExport = (format: ExportFormat) => {
+    if (detail) downloadFile(roomSummaryFile(detail, format));
+  };
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -94,6 +100,24 @@ export default function RoomHistoryPage() {
             {detail.participants.length} người tham gia
           </span>
         </p>
+        <div className="flex flex-wrap gap-2 pt-2">
+          <button
+            type="button"
+            data-testid="export-csv-button"
+            onClick={() => onExport('csv')}
+            className="rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-400"
+          >
+            Tải CSV
+          </button>
+          <button
+            type="button"
+            data-testid="export-md-button"
+            onClick={() => onExport('md')}
+            className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-100 hover:border-indigo-500"
+          >
+            Tải Markdown
+          </button>
+        </div>
       </header>
 
       {detail.rounds.length === 0 ? (
@@ -114,7 +138,15 @@ export default function RoomHistoryPage() {
               className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/60 p-5"
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-xl font-semibold">Round {entry.round.roundNumber}</h2>
+                <h2 className="min-w-0 text-xl font-semibold">
+                  Round {entry.round.roundNumber}
+                  {entry.round.story ? (
+                    <span data-testid="round-story" className="text-slate-400">
+                      {' '}
+                      — {entry.round.story}
+                    </span>
+                  ) : null}
+                </h2>
                 <span className="text-xs text-slate-500" data-testid="round-revealed-at">
                   {entry.round.revealedAt
                     ? `Lật bài lúc ${formatTimestamp(entry.round.revealedAt)}`

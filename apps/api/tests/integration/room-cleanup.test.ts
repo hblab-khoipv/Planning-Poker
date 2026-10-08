@@ -8,8 +8,11 @@ import {
   findRoomById,
   listParticipants,
   listRounds,
+  listRoundsWithVotes,
   listVotesForRound,
+  revealRound,
   type Room,
+  setRoundStory,
   type VotingRound,
 } from '../../src/db/repositories/index.js';
 import { startRoomCleanupJob, sweepIdleRooms } from '../../src/jobs/room-cleanup.js';
@@ -81,6 +84,37 @@ describe('idle room cleanup against Postgres', () => {
       const { rows } = await db.query<{ count: string }>(`SELECT count(*)::text FROM ${table}`);
       expect(rows[0]?.count, `${table} should be empty`).toBe('0');
     }
+  });
+
+  /**
+   * Round history has no retention of its own: it is rows in `voting_rounds`/`votes` hanging off
+   * the room, so the room's 24h TTL *is* its expiry. This asserts the whole of that claim — the
+   * stories, the cards and the read endpoint all go at the same moment, and the history the
+   * export reads from is gone rather than merely unreachable.
+   */
+  it('expires a room’s score history exactly when the room expires', async () => {
+    const { room, round } = await seedRoomWithRound(db, { guestCount: 2, votes: ['5', '5'] });
+    await setRoundStory(db, round.id, 'Đăng nhập bằng Google');
+    await revealRound(db, round.id);
+
+    const app = createApp({ pool: db });
+    const before = await request(app)
+      .get(`/rooms/${room.code}/rounds`)
+      .query({ participantId: (await listParticipants(db, room.id))[0]?.id });
+    expect(before.status).toBe(200);
+    expect(before.body.rounds[0].round.story).toBe('Đăng nhập bằng Google');
+
+    await setLastActive(room, 25);
+    await expect(sweep()).resolves.toEqual([room.code]);
+
+    await expect(listRoundsWithVotes(db, room.id)).resolves.toEqual([]);
+    const { rows } = await db.query<{ count: string }>(
+      `SELECT count(*)::text FROM voting_rounds WHERE story IS NOT NULL`,
+    );
+    expect(rows[0]?.count).toBe('0');
+
+    // And the way in is gone too: the room itself 404s, so there is nothing left to export.
+    await request(app).get(`/rooms/${room.code}/rounds`).expect(404);
   });
 
   it('leaves a room with recent activity untouched', async () => {

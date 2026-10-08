@@ -27,6 +27,7 @@ function round(overrides: Partial<VotingRound> = {}): VotingRound {
     roomId: ROOM.id,
     roundNumber: 1,
     status: 'revealed',
+    story: null,
     createdAt: new Date('2026-09-01T09:05:00.000Z'),
     revealedAt: new Date('2026-09-01T09:10:00.000Z'),
     ...overrides,
@@ -162,12 +163,37 @@ describe('canViewRoomHistory', () => {
   });
 
   /**
-   * A guest cannot be a member, but the predicate is asserted with `isMember: true` anyway: the
-   * point is that no membership evidence whatsoever lets an account-less caller through, because
-   * the only thing a guest could present is a participant id from their own browser.
+   * FR-9's archive is account-only, and this is where that is decided: the history screens send
+   * no seat id, so a guest reaching them has nothing to present and is refused however the
+   * membership lookup came out.
    */
-  it('refuses a guest even when a seat matches', () => {
+  it('refuses a guest who presents no seat in this room', () => {
     expect(canViewRoomHistory({ callerUserId: null, isMember: true })).toBe(false);
     expect(canViewRoomHistory({ callerUserId: null, isMember: false })).toBe(false);
+    expect(canViewRoomHistory({ callerUserId: null, isMember: false, seat: null })).toBe(false);
+  });
+
+  /**
+   * The in-room panel and its export. The seat has already been looked up against *this* room,
+   * and a guest seat with no cookie is exactly what the socket handshake accepts — that socket
+   * streams this room's revealed rounds live, so reading them back over REST grants nothing new.
+   */
+  it('lets a guest holding a guest seat in this very room read it', () => {
+    expect(
+      canViewRoomHistory({ callerUserId: null, isMember: false, seat: { userId: null } }),
+    ).toBe(true);
+  });
+
+  /** Seat ids are public on `/participants`, so an account's seat is not a credential. */
+  it('refuses a cookie-less caller presenting an account-owned seat', () => {
+    expect(
+      canViewRoomHistory({ callerUserId: null, isMember: false, seat: { userId: 'user-1' } }),
+    ).toBe(false);
+  });
+
+  it('ignores a seat presented by a signed-in stranger, as the socket does', () => {
+    expect(
+      canViewRoomHistory({ callerUserId: 'user-2', isMember: false, seat: { userId: null } }),
+    ).toBe(false);
   });
 });
